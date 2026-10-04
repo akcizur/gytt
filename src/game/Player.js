@@ -1,5 +1,6 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { ASSETS } from "./AssetRegistry.js";
+import { CharacterController } from "./CharacterController.js";
 
 const MOVE_DEAD=.08;
 const LOOK_SPEED=4.8;
@@ -28,6 +29,7 @@ export class Player{
     this.body=null;
     this.collider=null;
     this.controller=null;
+    this.motor=null;
   }
 
   build(){
@@ -40,13 +42,11 @@ export class Player{
     capsule.position.y=.95; capsule.visible=false;
     this.mesh.add(capsule);
 
-    const R=this.R, w=this.g.world.world;
-    this.body=w.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,1,10));
-    this.collider=w.createCollider(R.ColliderDesc.capsule(.55,.42),this.body);
-    this.controller=w.createCharacterController(.02);
-    this.controller.enableAutostep(.45,.3,true);
-    this.controller.enableSnapToGround(.2);
-    this.controller.setMaxSlopeClimbAngle(Math.PI*.72);
+    this.motor=new CharacterController(this.g,{x:0,y:0,z:10});
+    this.motor.build();
+    this.body=this.motor.body;
+    this.collider=this.motor.collider;
+    this.controller=this.motor.controller;
     this.sync();
     this.loadModel();
   }
@@ -148,40 +148,12 @@ export class Player{
     }
 
     const i=this.g.input;
-    const a=this.axes();
-    const moving=a.magnitude>MOVE_DEAD;
-    const sprint=i.down("ShiftLeft")||i.down("ShiftRight");
-    const maxSpeed=sprint?8.5:4.8;
-    const amount=moving?Math.min(1,(a.magnitude-MOVE_DEAD)/(1-MOVE_DEAD)):0;
-
-    const lx=a.x, lz=-a.y;
-    const wx=lx*Math.cos(this.yaw)+lz*Math.sin(this.yaw);
-    const wz=-lx*Math.sin(this.yaw)+lz*Math.cos(this.yaw);
-    const targetX=wx*maxSpeed*amount;
-    const targetZ=wz*maxSpeed*amount;
-    const blend=Math.min(1,(moving?18:24)*dt);
-    this.vel.x+=(targetX-this.vel.x)*blend;
-    this.vel.z+=(targetZ-this.vel.z)*blend;
-
-    if(!moving){this.vel.x*=Math.exp(-18*dt);this.vel.z*=Math.exp(-18*dt)}
-    this.vel.y+=-18*dt;
-    if(i.pressed("Space")&&this.grounded)this.vel.y=6.2;
-
-    const desired={x:this.vel.x*dt,y:this.vel.y*dt,z:this.vel.z*dt};
-    this.controller.computeColliderMovement(this.collider,desired);
-    const corrected=this.controller.computedMovement();
-    const current=this.body.translation();
-    const next={
-      x:current.x+corrected.x,
-      y:Math.max(1,current.y+corrected.y),
-      z:current.z+corrected.z
-    };
-
-    // Apply immediately; the render transform never waits for the physics step.
-    this.body.setNextKinematicTranslation(next);
-    this.pos.set(next.x,next.y-1,next.z);
-    this.grounded=this.controller.computedGrounded()||next.y<=1.02;
-    if(this.grounded&&this.vel.y<0)this.vel.y=0;
+    const motorState=this.motor.update(i,this.yaw,dt);
+    const moving=motorState.moving;
+    const sprint=motorState.sprint;
+    this.vel.copy(motorState.velocity);
+    this.pos.copy(this.motor.position);
+    this.grounded=this.motor.grounded;
 
     this.mesh.position.copy(this.pos);
 
@@ -275,6 +247,8 @@ export class Player{
 
   teleport(x,y,z){
     this.body.setTranslation({x,y:y+1,z},true);
+    this.motor.position.set(x,y,z);
+    this.motor.velocity.set(0,0,0);
     this.pos.set(x,y,z);
     this.mesh.position.copy(this.pos);
   }
