@@ -1,5 +1,6 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { retargetClip } from "three/addons/utils/SkeletonUtils.js";
+import { retargetClip } from "three/addons/utils/SkeletonUtils.js";
 import { ASSETS } from "./AssetRegistry.js";
 
 export class Player{
@@ -8,7 +9,7 @@ export class Player{
     this.pos=new this.T.Vector3(0,0,10);
     this.spawn=new this.T.Vector3(0,0,10);
     this.moveBlend=0;this.vel=new this.T.Vector3();
-    this.grounded=false;this.jumpSpeed=6.5;this.mixer=null;this.animations={};this.state="";this.animationSource=null;this.animationPromise=null;
+    this.grounded=false;this.jumpSpeed=6.5;this.mixer=null;this.animations={};this.state="";this.animationPromise=null;this.animationSource=null;this.animationPromise=null;
   }
   build(){
     const T=this.T;
@@ -72,6 +73,30 @@ export class Player{
     let result=null;
     root?.traverse(o=>{if(!result&&o.isSkinnedMesh)result=o});
     return result;
+  }
+  async loadAnimationLibrary(){
+    if(this.animationPromise)return this.animationPromise;
+    this.animationPromise=(async()=>{
+      for(const url of ASSETS.animationPacks||[]){
+        try{
+          const gltf=await new GLTFLoader().loadAsync(url);
+          let sourceMesh=null,targetMesh=null;
+          gltf.scene.traverse(o=>{if(!sourceMesh&&o.isSkinnedMesh)sourceMesh=o});
+          this.mesh.traverse(o=>{if(!targetMesh&&o.isSkinnedMesh)targetMesh=o});
+          if(!sourceMesh||!targetMesh||!this.mixer)continue;
+          for(const clip of gltf.animations){
+            try{
+              const key=clip.name.toLowerCase().replace(/[^a-z0-9]+/g,"_");
+              if(this.animations[key])continue;
+              const retargeted=retargetClip(targetMesh,sourceMesh,clip,{useFirstFramePosition:true});
+              this.animations[key]=this.mixer.clipAction(retargeted);
+            }catch(error){console.warn("Animation skipped",clip.name,error)}
+          }
+        }catch(error){console.warn("Animation pack unavailable",url,error)}
+      }
+      this.play("idle");
+    })();
+    return this.animationPromise;
   }
   play(wanted){
     if(!this.mixer)return;
