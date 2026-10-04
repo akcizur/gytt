@@ -8,7 +8,7 @@ const app=document.querySelector("#app");
 app.innerHTML=`
 <canvas id="game"></canvas>
 <div id="hud">
-  <div class="brand"><b>MAVON</b><span>DISTRICT</span></div>
+  <div class="brand"><b>GYTT</b><span>DISTRICT</span></div>
   <div class="stats"><span id="fps">60 FPS</span><span id="speed">0 km/h</span><span id="wanted">☆</span></div>
   <div class="mission"><small>FREE ROAM</small><strong id="mission">Loading district…</strong></div>
 </div>
