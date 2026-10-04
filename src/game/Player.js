@@ -3,7 +3,7 @@ import { ASSETS } from "./AssetRegistry.js";
 import { CharacterController } from "./CharacterController.js";
 
 const MOVE_DEAD_ZONE=.08;
-const CAMERA_SENSITIVITY=2.8;
+const CAMERA_SENSITIVITY=4.2;
 
 export class Player{
   constructor(g){
@@ -234,7 +234,8 @@ export class Player{
 
     const mouse=input.consumeMouseLook();
     const hasMouseLook=Math.abs(mouse.x)+Math.abs(mouse.y)>0;
-    if(input.touchActive){
+    const hasTouchLook=input.look.strength>0;
+    if(hasTouchLook){
       this.cameraYaw-=input.lookX()*CAMERA_SENSITIVITY*dt;
       this.cameraPitch-=input.lookY()*CAMERA_SENSITIVITY*dt;
       this.cameraPitch=Math.max(-.22,Math.min(.82,this.cameraPitch));
@@ -250,10 +251,11 @@ export class Player{
       this.cameraYaw+=delta*Math.min(1,dt*1.5);
     }
 
+    const horizontal=7;
     const offset=new T.Vector3(
-      Math.sin(this.cameraYaw)*7,
-      2.8+Math.sin(this.cameraPitch)*2.3,
-      Math.cos(this.cameraYaw)*7
+      Math.sin(this.cameraYaw)*horizontal,
+      2.4+this.cameraPitch*3.0,
+      Math.cos(this.cameraYaw)*horizontal
     );
     const desired=target.clone().add(offset);
     const safe=this.g.world.cameraPosition(target,desired,this.mesh,1.05);
