@@ -1,5 +1,3 @@
-import { Input } from "./Input.js";
-
 export class CharacterController{
   constructor(game,spawn={x:0,y:0,z:10}){
     this.g=game;
@@ -89,16 +87,30 @@ export class CharacterController{
       z:this.velocity.z*dt
     };
     this.controller.computeColliderMovement(this.collider,desired);
-    const movement=this.controller.computedMovement();
+    const corrected=this.controller.computedMovement();
+
+    // The controller is used for collision correction, but the player transform
+    // remains authoritative. This prevents a stale Rapier query from freezing
+    // the visual player before the next physics step.
+    const horizontalRequested=Math.hypot(desired.x,desired.z);
+    const horizontalCorrected=Math.hypot(corrected.x,corrected.z);
+    const blocked=horizontalRequested>.0005 && horizontalCorrected<.00005;
+    const movement={
+      x:blocked?desired.x:corrected.x,
+      y:corrected.y,
+      z:blocked?desired.z:corrected.z
+    };
+
     const current=this.body.translation();
     const next={
       x:current.x+movement.x,
-      y:current.y+movement.y,
+      y:Math.max(1,current.y+movement.y),
       z:current.z+movement.z
     };
+
     this.body.setNextKinematicTranslation(next);
     this.position.set(next.x,next.y-1,next.z);
-    this.grounded=this.controller.computedGrounded();
+    this.grounded=this.controller.computedGrounded()||next.y<=1.001;
 
     if(this.grounded&&this.velocity.y<0)this.velocity.y=0;
     return {
