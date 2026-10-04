@@ -4,7 +4,7 @@ export class Input{
     addEventListener("keydown",e=>{if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();if(!this.keys.has(e.code))this.just.add(e.code);this.keys.add(e.code)},{passive:false});
     addEventListener("keyup",e=>this.keys.delete(e.code));
     addEventListener("blur",()=>this.reset());addEventListener("visibilitychange",()=>document.hidden&&this.reset());
-    document.querySelectorAll("[data-action]").forEach(b=>{const map={run:"ShiftLeft",jump:"Space",interact:"KeyE",reset:"KeyR"};const c=map[b.dataset.action];const down=e=>{e.preventDefault();b.setPointerCapture?.(e.pointerId);this.activePointers.add(e.pointerId);if(!this.keys.has(c))this.just.add(c);this.keys.add(c)};const up=e=>{e.preventDefault();this.activePointers.delete(e.pointerId);this.keys.delete(c)};b.addEventListener("pointerdown",down);["pointerup","pointercancel","lostpointercapture"].forEach(t=>b.addEventListener(t,up))});
+    document.querySelectorAll("[data-action]").forEach(b=>{const map={run:"ShiftLeft",jump:"Space",crouch:"ControlLeft",roll:"KeyQ",interact:"KeyE",reset:"KeyR"};const c=map[b.dataset.action];const down=e=>{e.preventDefault();b.setPointerCapture?.(e.pointerId);this.activePointers.add(e.pointerId);if(!this.keys.has(c))this.just.add(c);this.keys.add(c)};const up=e=>{e.preventDefault();this.activePointers.delete(e.pointerId);this.keys.delete(c)};b.addEventListener("pointerdown",down);["pointerup","pointercancel","lostpointercapture"].forEach(t=>b.addEventListener(t,up))});
     this.bindSticks();
   }
   bindSticks(){
