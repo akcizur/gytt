@@ -1,0 +1,1 @@
+export class Mission{constructor(g){this.g=g;this.el=document.querySelector("#mission")}build(){}update(){this.el.textContent=this.g.player.pos.length()>120?"Reach the city center":"Explore the district"}}
