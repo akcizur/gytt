@@ -202,7 +202,10 @@ export class Player{
     const i=this.g.input;
     const axes=this.getMoveAxes();
     const moving=axes.magnitude>MOVE_DEAD_ZONE;
-    this.moveBlend+=((moving?1:0)-this.moveBlend)*Math.min(1,dt*10);
+    const analogMagnitude=moving
+      ?Math.min(1,(axes.magnitude-MOVE_DEAD_ZONE)/(1-MOVE_DEAD_ZONE))
+      :0;
+    this.moveBlend+=(analogMagnitude-this.moveBlend)*Math.min(1,dt*10);
 
     let x=axes.x;
     let z=-axes.y;
@@ -213,7 +216,7 @@ export class Player{
     }
 
     const sprint=i.down("ShiftLeft")||i.down("ShiftRight");
-    const speed=(sprint?9:5)*Math.max(.35,axes.magnitude);
+    const speed=(sprint?9:5)*analogMagnitude;
 
     const yaw=this.cameraYaw;
     const wx=x*Math.cos(yaw)+z*Math.sin(yaw);
@@ -315,12 +318,26 @@ export class Player{
     const T=this.T;
     const v=this.g.vehicle;
     const c=this.g.world.camera;
+    const input=this.g.input;
     const target=v.pos.clone().add(new T.Vector3(0,1.4,0));
-    const back=new T.Vector3(0,3.1,8).applyAxisAngle(
-      new T.Vector3(0,1,0),
-      v.heading
+
+    if(input.look.strength>0){
+      this.cameraYaw-=input.lookX()*CAMERA_SENSITIVITY*dt;
+      this.cameraPitch-=input.lookY()*CAMERA_SENSITIVITY*dt;
+      this.cameraPitch=Math.max(-.18,Math.min(.7,this.cameraPitch));
+    }else{
+      let delta=v.heading-this.cameraYaw;
+      while(delta>Math.PI)delta-=Math.PI*2;
+      while(delta<-Math.PI)delta+=Math.PI*2;
+      this.cameraYaw+=delta*Math.min(1,dt*2.2);
+    }
+
+    const back=new T.Vector3(
+      Math.sin(this.cameraYaw)*8,
+      3.1+Math.sin(this.cameraPitch)*2,
+      Math.cos(this.cameraYaw)*8
     );
-    c.position.lerp(target.clone().add(back),.18);
+    c.position.lerp(target.clone().add(back),.16);
     c.lookAt(target);
   }
 
