@@ -9,7 +9,7 @@ export class Input{
     this.bindSticks();
   }
   bindSticks(){
-    const create=(id,kind)=>{const z=document.querySelector(id);if(!z)return;const j=nipplejs.create({zone:z,mode:"static",size:118,threshold:.1,fadeTime:100,restJoystick:true,position:{left:"50%",top:"50%"},color:{front:"rgba(255,255,255,.8)",back:"rgba(255,255,255,.1)"}});j.on("move",(e,d)=>{const v=d?.vector;if(!v)return;const f=Math.min(1,d.force||0);this[kind].x=v.x*f;this[kind].y=-v.y*f;this.touch=true});j.on("end",()=>{this[kind].x=0;this[kind].y=0;this.touch=Object.values(this.move).some(Boolean)||Object.values(this.look).some(Boolean)});return j};
+    const create=(id,kind)=>{const z=document.querySelector(id);if(!z)return;const j=nipplejs.create({zone:z,mode:"static",size:118,threshold:.04,fadeTime:80,restJoystick:true,multitouch:true,maxNumberOfNipples:2,position:{left:"50%",top:"50%"},color:{front:"rgba(255,255,255,.8)",back:"rgba(255,255,255,.1)"}});j.on("move",(e,d)=>{const v=d?.vector;if(!v)return;const f=Math.max(.15,Math.min(1,d.force||0));this[kind].x=Math.max(-1,Math.min(1,v.x*f));this[kind].y=Math.max(-1,Math.min(1,-v.y*f));this.touch=true});j.on("end",()=>{this[kind].x=0;this[kind].y=0;this.touch=Math.hypot(this.move.x,this.move.y)>0.02||Math.hypot(this.look.x,this.look.y)>0.02});return j};
     this.left=create("#move-zone","move");this.right=create("#look-zone","look");
   }
   down(c){return this.keys.has(c)}
