@@ -1,4 +1,5 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { retargetClip } from "three/addons/utils/SkeletonUtils.js";
 import { ASSETS } from "./AssetRegistry.js";
 
 export class Player{
@@ -7,7 +8,7 @@ export class Player{
     this.pos=new this.T.Vector3(0,0,10);
     this.spawn=new this.T.Vector3(0,0,10);
     this.moveBlend=0;this.vel=new this.T.Vector3();
-    this.grounded=false;this.jumpSpeed=6.5;this.mixer=null;this.animations={};this.state="";
+    this.grounded=false;this.jumpSpeed=6.5;this.mixer=null;this.animations={};this.state="";this.animationSource=null;this.animationPromise=null;
   }
   build(){
     const T=this.T;
@@ -36,12 +37,46 @@ export class Player{
       this.mixer=gltf.animations.length?new this.T.AnimationMixer(model):null;
       for(const clip of gltf.animations)this.animations[clip.name.toLowerCase()]=this.mixer.clipAction(clip);
       this.play("idle");
+      this.loadAnimationLibrary();
     }catch(e){console.warn("CC0 hero unavailable; procedural fallback active",e)}
+  }
+  async loadAnimationLibrary(){
+    if(this.animationPromise)return this.animationPromise;
+    this.animationPromise=(async()=>{
+      for(const url of ASSETS.animationPacks||[]){
+        try{
+          const gltf=await new GLTFLoader().loadAsync(url);
+          const sourceRoot=gltf.scene;
+          let sourceMesh=null;
+          sourceRoot.traverse(o=>{if(!sourceMesh&&o.isSkinnedMesh)sourceMesh=o});
+          const targetMesh=this.findSkinnedMesh(this.mesh);
+          if(!sourceMesh||!targetMesh)continue;
+          for(const clip of gltf.animations){
+            try{
+              const name=clip.name.toLowerCase();
+              const key=name.replace(/[^a-z0-9]+/g,"_");
+              if(this.animations[key])continue;
+              const retargeted=retargetClip(targetMesh,sourceMesh,clip,{useFirstFramePosition:true});
+              const action=this.mixer.clipAction(retargeted);
+              this.animations[key]=action;
+            }catch(error){console.warn("Animation retarget skipped",clip.name,error)}
+          }
+          this.animationSource=(this.animationSource||0)+1;
+        }catch(error){console.warn("Open animation pack unavailable",url,error)}
+      }
+      this.play("idle");
+    })();
+    return this.animationPromise;
+  }
+  findSkinnedMesh(root){
+    let result=null;
+    root?.traverse(o=>{if(!result&&o.isSkinnedMesh)result=o});
+    return result;
   }
   play(wanted){
     if(!this.mixer)return;
     const keys=Object.keys(this.animations);
-    const aliases=wanted==="run"?["run","jog","sprint","walk"]:wanted==="walk"?["walk","locomotion","idle"]:wanted==="idle"?["idle","stand"]:["jump","fall","idle"];
+    const aliases=wanted==="run"?["run","sprint","jog","fast"]:wanted==="walk"?["walk","locomotion","jog","idle"]:wanted==="idle"?["idle","stand","breathing"]:["jump","fall","land","idle"];
     const key=keys.find(k=>aliases.some(a=>k.includes(a)))||keys[0];
     if(!key||this.state===wanted)return;
     Object.values(this.animations).forEach(a=>a.fadeOut(.12));
