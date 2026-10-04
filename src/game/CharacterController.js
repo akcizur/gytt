@@ -89,16 +89,13 @@ export class CharacterController{
     this.controller.computeColliderMovement(this.collider,desired);
     const corrected=this.controller.computedMovement();
 
-    // The controller is used for collision correction, but the player transform
-    // remains authoritative. This prevents a stale Rapier query from freezing
-    // the visual player before the next physics step.
-    const horizontalRequested=Math.hypot(desired.x,desired.z);
-    const horizontalCorrected=Math.hypot(corrected.x,corrected.z);
-    const blocked=horizontalRequested>.0005 && horizontalCorrected<.00005;
+    // Rapier is authoritative for collision correction. Never bypass the
+    // corrected translation: doing so would let the player tunnel through
+    // buildings when a query reports a blocked movement.
     const movement={
-      x:blocked?desired.x:corrected.x,
+      x:corrected.x,
       y:corrected.y,
-      z:blocked?desired.z:corrected.z
+      z:corrected.z
     };
 
     const current=this.body.translation();
