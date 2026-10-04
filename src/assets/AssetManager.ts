@@ -6,6 +6,10 @@ export type CharacterAsset = {
   animations: T.AnimationClip[];
 };
 
+export type EnvironmentAsset = {
+  scene: T.Group;
+};
+
 export class AssetManager {
   private readonly loader = new GLTFLoader();
   private readonly cache = new Map<string, Promise<GLTF>>();
@@ -27,12 +31,19 @@ export class AssetManager {
 
   async loadCharacter(primaryUrl: string, fallbackUrl?: string): Promise<CharacterAsset> {
     try {
-      const gltf = await this.loadGLTF(primaryUrl);
-      return this.toCharacterAsset(gltf);
+      return this.toCharacterAsset(await this.loadGLTF(primaryUrl));
     } catch (primaryError) {
       if (!fallbackUrl) throw primaryError;
-      const gltf = await this.loadGLTF(fallbackUrl);
-      return this.toCharacterAsset(gltf);
+      return this.toCharacterAsset(await this.loadGLTF(fallbackUrl));
+    }
+  }
+
+  async loadEnvironment(primaryUrl: string, fallbackUrl?: string): Promise<EnvironmentAsset> {
+    try {
+      return this.toEnvironmentAsset(await this.loadGLTF(primaryUrl));
+    } catch (primaryError) {
+      if (!fallbackUrl) throw primaryError;
+      return this.toEnvironmentAsset(await this.loadGLTF(fallbackUrl));
     }
   }
 
@@ -42,12 +53,23 @@ export class AssetManager {
 
   private toCharacterAsset(gltf: GLTF): CharacterAsset {
     const scene = gltf.scene;
+    this.prepareScene(scene);
+    return { scene, animations: gltf.animations };
+  }
+
+  private toEnvironmentAsset(gltf: GLTF): EnvironmentAsset {
+    const scene = gltf.scene;
+    this.prepareScene(scene);
+    return { scene };
+  }
+
+  private prepareScene(scene: T.Group) {
     scene.traverse((object) => {
       const mesh = object as T.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.frustumCulled = true;
     });
-    return { scene, animations: gltf.animations };
   }
 }
