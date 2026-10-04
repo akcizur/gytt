@@ -1,4 +1,5 @@
 import * as T from "three";
+import type { EnvironmentAsset } from "../assets/AssetManager";
 
 type RapierApi = {
   ColliderDesc: {
@@ -11,6 +12,8 @@ type RapierApi = {
 export class World {
   private readonly sceneObjects: T.Object3D[] = [];
   private readonly colliders: unknown[] = [];
+  private houseVisual?: T.Object3D;
+  private shedVisual?: T.Object3D;
 
   constructor(
     private readonly scene: T.Scene,
@@ -23,6 +26,16 @@ export class World {
     this.addVegetation();
   }
 
+  attachHouseAsset(asset: EnvironmentAsset) {
+    this.replaceVisual(this.houseVisual, asset.scene, new T.Vector3(0, 0, -5), 1);
+    this.houseVisual = asset.scene;
+  }
+
+  attachShedAsset(asset: EnvironmentAsset) {
+    this.replaceVisual(this.shedVisual, asset.scene, new T.Vector3(11, 0, -2), 1);
+    this.shedVisual = asset.scene;
+  }
+
   dispose() {
     for (const collider of this.colliders) {
       try {
@@ -31,14 +44,7 @@ export class World {
     }
 
     for (const object of this.sceneObjects) {
-      object.parent?.remove(object);
-      object.traverse((node) => {
-        const mesh = node as T.Mesh;
-        if (!mesh.isMesh) return;
-        mesh.geometry.dispose();
-        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        for (const material of materials) material.dispose();
-      });
+      this.disposeObject(object);
     }
 
     this.sceneObjects.length = 0;
@@ -71,61 +77,51 @@ export class World {
   private addHouse() {
     const house = new T.Group();
     house.position.set(0, 0, -5);
+    this.houseVisual = house;
 
     const wall = new T.MeshStandardMaterial({ color: 0xd7d0c2, roughness: 0.9 });
     const darkWall = new T.MeshStandardMaterial({ color: 0xb7afa0, roughness: 0.95 });
     const roof = new T.MeshStandardMaterial({ color: 0x3d3833, roughness: 0.92 });
-    const glass = new T.MeshStandardMaterial({
-      color: 0x607b82,
-      roughness: 0.2,
-      metalness: 0.05,
-    });
+    const glass = new T.MeshStandardMaterial({ color: 0x607b82, roughness: 0.2, metalness: 0.05 });
     const wood = new T.MeshStandardMaterial({ color: 0x5d4636, roughness: 0.85 });
 
     const body = new T.Mesh(new T.BoxGeometry(13, 5.4, 9), wall);
     body.position.y = 2.7;
-    this.addMesh(house, body);
+    house.add(body);
 
     const roofMesh = new T.Mesh(new T.ConeGeometry(7.9, 3.2, 4), roof);
     roofMesh.rotation.y = Math.PI / 4;
     roofMesh.position.y = 6.9;
     roofMesh.scale.z = 0.7;
-    this.addMesh(house, roofMesh);
+    house.add(roofMesh);
 
     const porch = new T.Mesh(new T.BoxGeometry(7, 0.3, 2.2), wood);
     porch.position.set(0, 0.16, 5.2);
-    this.addMesh(house, porch);
+    house.add(porch);
 
     const door = new T.Mesh(new T.BoxGeometry(1.35, 2.7, 0.16), wood);
     door.position.set(0, 1.35, 4.56);
-    this.addMesh(house, door);
+    house.add(door);
 
     for (const x of [-4.2, 4.2]) {
       const window = new T.Mesh(new T.BoxGeometry(2.35, 1.55, 0.16), glass);
       window.position.set(x, 2.8, 4.56);
-      this.addMesh(house, window);
+      house.add(window);
 
       const frameH = new T.Mesh(new T.BoxGeometry(0.08, 1.7, 0.2), darkWall);
       frameH.position.set(x, 2.8, 4.45);
-      this.addMesh(house, frameH);
+      house.add(frameH);
 
       const frameV = new T.Mesh(new T.BoxGeometry(2.5, 0.08, 0.2), darkWall);
       frameV.position.set(x, 2.8, 4.45);
-      this.addMesh(house, frameV);
+      house.add(frameV);
     }
 
     const chimney = new T.Mesh(new T.BoxGeometry(0.9, 2.2, 0.9), darkWall);
     chimney.position.set(3.5, 7.2, -1.8);
-    this.addMesh(house, chimney);
+    house.add(chimney);
 
-    house.traverse((node) => {
-      const mesh = node as T.Mesh;
-      if (mesh.isMesh) {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-      }
-    });
-
+    this.prepareObject(house);
     this.addObject(house);
     this.addBoxCollider(6.5, 2.7, 4.5, 0, 2.7, -5);
   }
@@ -133,6 +129,7 @@ export class World {
   private addShed() {
     const shed = new T.Group();
     shed.position.set(11, 0, -2);
+    this.shedVisual = shed;
 
     const wall = new T.MeshStandardMaterial({ color: 0x76614f, roughness: 0.95 });
     const roof = new T.MeshStandardMaterial({ color: 0x393733, roughness: 0.95 });
@@ -140,24 +137,17 @@ export class World {
 
     const body = new T.Mesh(new T.BoxGeometry(5.5, 3.4, 4.5), wall);
     body.position.y = 1.7;
-    this.addMesh(shed, body);
+    shed.add(body);
 
     const roofMesh = new T.Mesh(new T.BoxGeometry(6.1, 0.35, 5.1), roof);
     roofMesh.position.y = 3.55;
-    this.addMesh(shed, roofMesh);
+    shed.add(roofMesh);
 
     const door = new T.Mesh(new T.BoxGeometry(1.7, 2.7, 0.12), doorMaterial);
     door.position.set(0, 1.35, 2.3);
-    this.addMesh(shed, door);
+    shed.add(door);
 
-    shed.traverse((node) => {
-      const mesh = node as T.Mesh;
-      if (mesh.isMesh) {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-      }
-    });
-
+    this.prepareObject(shed);
     this.addObject(shed);
     this.addBoxCollider(2.75, 1.7, 2.25, 11, 1.7, -2);
   }
@@ -186,34 +176,58 @@ export class World {
       crown.position.y = 3.1;
 
       tree.add(trunk, crown);
-      tree.traverse((node) => {
-        const mesh = node as T.Mesh;
-        if (mesh.isMesh) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-        }
-      });
+      this.prepareObject(tree);
       this.addObject(tree);
     }
   }
 
-  private addBoxCollider(
-    hx: number,
-    hy: number,
-    hz: number,
-    x: number,
-    y: number,
-    z: number,
+  private replaceVisual(
+    previous: T.Object3D | undefined,
+    next: T.Object3D,
+    position: T.Vector3,
+    scale: number,
   ) {
+    if (previous) {
+      previous.parent?.remove(previous);
+      const index = this.sceneObjects.indexOf(previous);
+      if (index >= 0) this.sceneObjects.splice(index, 1);
+      this.disposeObject(previous);
+    }
+
+    next.position.copy(position);
+    next.scale.setScalar(scale);
+    this.prepareObject(next);
+    this.addObject(next);
+  }
+
+  private prepareObject(object: T.Object3D) {
+    object.traverse((node) => {
+      const mesh = node as T.Mesh;
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = true;
+      }
+    });
+  }
+
+  private disposeObject(object: T.Object3D) {
+    object.parent?.remove(object);
+    object.traverse((node) => {
+      const mesh = node as T.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) material.dispose();
+    });
+  }
+
+  private addBoxCollider(hx: number, hy: number, hz: number, x: number, y: number, z: number) {
     this.colliders.push(
       this.physics.createCollider(
         this.R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, y, z),
       ),
     );
-  }
-
-  private addMesh(parent: T.Object3D, mesh: T.Mesh) {
-    parent.add(mesh);
   }
 
   private addObject(object: T.Object3D) {
