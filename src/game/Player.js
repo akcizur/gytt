@@ -1,5 +1,4 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { retargetClip } from "three/addons/utils/SkeletonUtils.js";
 import { ASSETS } from "./AssetRegistry.js";
 import { CharacterController } from "./CharacterController.js";
 
@@ -115,24 +114,16 @@ export class Player{
     if(!url)return;
     try{
       const gltf=await new GLTFLoader().loadAsync(url);
-      let sourceMesh=null;
-      this.traverseFirstSkinned(gltf.scene,result=>{if(!sourceMesh)sourceMesh=result});
-      let targetMesh=null;
-      this.traverseFirstSkinned(this.mesh,result=>{if(!targetMesh)targetMesh=result});
+      if(!this.mixer)return;
 
-      if(!sourceMesh||!targetMesh||!this.mixer)return;
-
+      // The player mesh and Quaternius UAL use the same 65-bone humanoid rig.
+      // Play the library clips directly instead of retargeting them at runtime.
+      // This avoids the classic T-pose failure caused by mismatched bone maps.
       for(const clip of gltf.animations){
         try{
           const key=this.normalizeAnimationName(clip.name);
           if(this.animations[key])continue;
-          const retargeted=retargetClip(
-            targetMesh,
-            sourceMesh,
-            clip,
-            {useFirstFramePosition:true}
-          );
-          this.animations[key]=this.mixer.clipAction(retargeted);
+          this.animations[key]=this.mixer.clipAction(clip);
         }catch(error){
           console.warn("Animation skipped",clip.name,error);
         }
@@ -141,12 +132,6 @@ export class Player{
     }catch(error){
       console.warn("Open animation pack unavailable",url,error);
     }
-  }
-
-  traverseFirstSkinned(root,callback){
-    root?.traverse(object=>{
-      if(object.isSkinnedMesh)callback(object);
-    });
   }
 
   play(wanted,force=false){
