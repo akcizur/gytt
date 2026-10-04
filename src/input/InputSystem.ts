@@ -5,7 +5,7 @@ export type Actions = {
 };
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-const deadzone = (v: number, zone = 0.12) => {
+const deadzone = (v: number, zone = 0.10) => {
   const a = Math.abs(v);
   if (a <= zone) return 0;
   return Math.sign(v) * ((a - zone) / (1 - zone));
@@ -24,6 +24,7 @@ export class InputSystem {
   private stickMove = { x: 0, y: 0 };
   private stickLook = { x: 0, y: 0 };
   private frameSampled = false;
+  private lastLookTime = performance.now();
 
   constructor(private canvas: HTMLCanvasElement) {
     addEventListener("keydown", e => {
@@ -88,7 +89,7 @@ export class InputSystem {
       const p = this.pointers.get(e.pointerId);
       if (!p || this.activeStick[p.kind] !== e.pointerId) return;
 
-      const radius = Math.max(45, Math.min(el.clientWidth, el.clientHeight) * 0.32);
+      const radius = Math.max(42, Math.min(el.clientWidth, el.clientHeight) * 0.38);
       const dx = e.clientX - p.x;
       const dy = e.clientY - p.y;
 
@@ -97,9 +98,9 @@ export class InputSystem {
         // Screen Y is inverted: swipe upward means forward.
         this.stickMove.y = clamp(-dy / radius);
       } else {
-        this.stickLook.x += dx * 0.00075;
+        this.stickLook.x += dx * 0.00135;
         // Screen Y is inverted for orbit control: swipe up looks up.
-        this.stickLook.y += dy * 0.00075;
+        this.stickLook.y += dy * 0.00115;
         p.x = e.clientX;
         p.y = e.clientY;
       }
@@ -142,8 +143,8 @@ export class InputSystem {
 
     this.actions.moveX = clamp(this.stickMove.x + keyX + gp.moveX);
     this.actions.moveY = clamp(this.stickMove.y + keyY + gp.moveY);
-    this.actions.lookX += this.stickLook.x + gp.lookX * 0.055;
-    this.actions.lookY += this.stickLook.y + gp.lookY * 0.045;
+    this.actions.lookX += this.stickLook.x + gp.lookX * 0.075;
+    this.actions.lookY += this.stickLook.y + gp.lookY * 0.060;
 
     this.actions.sprint =
       this.down("ShiftLeft") || this.down("ShiftRight") || !!gamepad?.buttons[10]?.pressed;
