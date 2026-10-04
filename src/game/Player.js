@@ -1,6 +1,7 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { retargetClip } from "three/addons/utils/SkeletonUtils.js";
 import { ASSETS } from "./AssetRegistry.js";
+import { CharacterController } from "./CharacterController.js";
 
 const MOVE_DEAD_ZONE=.08;
 const CAMERA_SENSITIVITY=2.8;
@@ -25,6 +26,7 @@ export class Player{
     this.cameraYaw=0;
     this.cameraPitch=.28;
     this.cameraReady=false;
+    this.controller=new CharacterController(g,{x:0,y:0,z:10});
   }
 
   build(){
@@ -48,20 +50,9 @@ export class Player{
     head.castShadow=true;
     this.mesh.add(head);
 
-    this.body=this.g.world.world.createRigidBody(
-      this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,1,10)
-    );
-    this.collider=this.g.world.world.createCollider(
-      this.R.ColliderDesc.capsule(.55,.42),
-      this.body
-    );
-
-    this.controller=this.g.world.world.createCharacterController(.03);
-    this.controller.enableAutostep(.45,.3,true);
-    this.controller.enableSnapToGround(.2);
-    this.controller.setMaxSlopeClimbAngle(Math.PI*.72);
-    this.controller.setApplyImpulsesToDynamicBodies(true);
-
+    this.controller.build();
+    this.body=this.controller.body;
+    this.collider=this.controller.collider;
     this.syncMesh();
     this.loadModel();
   }
@@ -213,69 +204,20 @@ export class Player{
     }
 
     const i=this.g.input;
-    const axes=this.getMoveAxes();
-    const moving=axes.magnitude>MOVE_DEAD_ZONE;
-    const analogMagnitude=moving
-      ?Math.min(1,(axes.magnitude-MOVE_DEAD_ZONE)/(1-MOVE_DEAD_ZONE))
-      :0;
-    this.moveBlend+=(analogMagnitude-this.moveBlend)*Math.min(1,dt*10);
-
-    let x=axes.x;
-    let z=-axes.y;
-    if(moving){
-      const n=Math.hypot(x,z);
-      x/=n;
-      z/=n;
-    }
-
-    const sprint=i.down("ShiftLeft")||i.down("ShiftRight");
-    const speed=(sprint?9:5)*analogMagnitude;
-
-    const yaw=this.cameraYaw;
-    const wx=x*Math.cos(yaw)+z*Math.sin(yaw);
-    const wz=-x*Math.sin(yaw)+z*Math.cos(yaw);
-
-    this.vel.x+=(wx*speed-this.vel.x)*Math.min(1,dt*12);
-    this.vel.z+=(wz*speed-this.vel.z)*Math.min(1,dt*12);
-
-    if(!moving){
-      const drag=Math.pow(.02,dt);
-      this.vel.x*=drag;
-      this.vel.z*=drag;
-    }
-
-    if(i.pressed("Space")&&this.grounded)this.vel.y=this.jumpSpeed;
-    this.vel.y-=18*dt;
-
-    this.controller.computeColliderMovement(this.collider,{
-      x:this.vel.x*dt,
-      y:this.vel.y*dt,
-      z:this.vel.z*dt
-    });
-
-    const movement=this.controller.computedMovement();
-    const p=this.body.translation();
-    const next={
-      x:p.x+movement.x,
-      y:p.y+movement.y,
-      z:p.z+movement.z
-    };
-
-    this.body.setNextKinematicTranslation(next);
-    this.pos.set(next.x,next.y-1,next.z);
+    const result=this.controller.update(i,this.cameraYaw,dt);
+    this.pos.copy(this.controller.position);
     this.mesh.position.copy(this.pos);
-
-    this.grounded=this.controller.computedGrounded();
-    if(this.grounded&&this.vel.y<0)this.vel.y=0;
+    this.grounded=this.controller.grounded;
+    this.vel.copy(this.controller.velocity);
 
     const state=!this.grounded
       ?(this.vel.y>0?"jump":"fall")
-      :(moving?(sprint?"run":"walk"):"idle");
+      :(result.moving?(result.sprint?"run":"walk"):"idle");
     this.play(state);
 
     if(this.mixer)this.mixer.update(dt);
 
-    if(moving){
+    if(result.moving){
       const targetYaw=Math.atan2(this.vel.x,this.vel.z);
       let delta=targetYaw-this.mesh.rotation.y;
       while(delta>Math.PI)delta-=Math.PI*2;
@@ -286,9 +228,9 @@ export class Player{
     if(this.mesh.userData.model&&!this.mixer){
       const model=this.mesh.userData.model;
       const phase=performance.now()*.012;
-      const bob=moving?Math.abs(Math.sin(phase*1.7))*.035:0;
+      const bob=result.moving?Math.abs(Math.sin(phase*1.7))*.035:0;
       model.position.y=model.userData.baseY+bob;
-      model.rotation.x=(moving?.025:0);
+      model.rotation.x=(result.moving?.025:0);
     }
 
     this.updateCamera(dt);
@@ -362,13 +304,12 @@ export class Player{
 
   reset(){
     this.mesh.rotation.y=0;
-    this.body.setNextKinematicTranslation({
-      x:this.spawn.x,
-      y:1,
-      z:this.spawn.z
-    });
-    this.vel.set(0,0,0);
-    this.grounded=false;
+    this.controller.reset();
+    this.body=this.controller.body;
+    this.collider=this.controller.collider;
+    this.pos.copy(this.controller.position);
+    this.vel.copy(this.controller.velocity);
+    this.grounded=this.controller.grounded;
     this.cameraPitch=.28;
     this.cameraYaw=0;
     this.syncMesh();
