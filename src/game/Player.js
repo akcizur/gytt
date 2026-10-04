@@ -118,7 +118,11 @@ export class Player{
     if(moving){const n=Math.hypot(x,z);x/=n;z/=n}
     const sprint=i.down("ShiftLeft")||i.down("ShiftRight"),speed=sprint?9:5;
     // Camera-relative movement keeps WASD intuitive in third person.
-    const yaw=Math.atan2(this.g.world.camera.position.x-this.pos.x,this.g.world.camera.position.z-this.pos.z);
+    const camera=this.g.world.camera;
+    const yaw=Math.atan2(camera.position.x-this.pos.x,camera.position.z-this.pos.z);
+    if(Math.abs(this.g.input.lookX())>.04){
+      this.g.world.cameraYaw=(this.g.world.cameraYaw||0)+this.g.input.lookX()*dt*2.8;
+    }
     const wx=x*Math.cos(yaw)+z*Math.sin(yaw),wz=-x*Math.sin(yaw)+z*Math.cos(yaw);
     this.vel.x+=(wx*speed-this.vel.x)*Math.min(1,dt*12);
     this.vel.z+=(wz*speed-this.vel.z)*Math.min(1,dt*12);
@@ -152,7 +156,8 @@ export class Player{
   }
   updateCamera(){
     const T=this.T,c=this.g.world.camera,target=this.pos.clone().add(new T.Vector3(0,1.2,0));
-    const back=new T.Vector3(0,2.8,7).applyAxisAngle(new T.Vector3(0,1,0),this.mesh.rotation.y);
+    const yaw=this.g.world.cameraYaw||this.mesh.rotation.y;
+    const back=new T.Vector3(0,2.8,7).applyAxisAngle(new T.Vector3(0,1,0),yaw);
     c.position.lerp(target.clone().add(back),.14);c.lookAt(target);
   }
   followVehicle(){
