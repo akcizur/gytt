@@ -11,6 +11,11 @@ const FIXED_DT = 1 / 60;
 const MAX_FRAME_DT = 0.1;
 const MAX_STEPS_PER_FRAME = 5;
 
+const resolvePublicAsset = (path: string) => {
+  const baseUrl = new URL(import.meta.env.BASE_URL, document.baseURI);
+  return new URL(path.replace(/^\/+/, ""), baseUrl).href;
+};
+
 export class Game {
   private readonly scene = new T.Scene();
   private readonly render: RenderSystem;
@@ -55,7 +60,7 @@ export class Game {
   async start() {
     if (this.disposed || this.running) return;
 
-    const localUrl = new URL("assets/characters/RobotExpressive.glb", import.meta.env.BASE_URL).href;
+    const localUrl = resolvePublicAsset("assets/characters/RobotExpressive.glb");
     const remoteUrl = "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
 
     try {
@@ -80,9 +85,8 @@ export class Game {
   }
 
   private async loadShowcaseEnvironment() {
-    const base = import.meta.env.BASE_URL;
-    const houseUrl = new URL("assets/environment/house.glb", base).href;
-    const shedUrl = new URL("assets/environment/shed.glb", base).href;
+    const houseUrl = resolvePublicAsset("assets/environment/house.glb");
+    const shedUrl = resolvePublicAsset("assets/environment/shed.glb");
 
     try {
       const house = await this.assets.loadEnvironment(houseUrl);
