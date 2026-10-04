@@ -61,10 +61,9 @@ export class Player{
     this.vel.y-=18*dt;
     this.controller.computeColliderMovement(this.collider,{x:this.vel.x*dt,y:this.vel.y*dt,z:this.vel.z*dt});
     const m=this.controller.computedMovement(),p=this.body.translation();
-    this.body.setNextKinematicTranslation({x:p.x+m.x,y:p.y+m.y,z:p.z+m.z});
+    const next={x:p.x+m.x,y:p.y+m.y,z:p.z+m.z};this.body.setNextKinematicTranslation(next);this.pos.set(next.x,next.y-1,next.z);this.mesh.position.copy(this.pos);
     this.grounded=this.controller.computedGrounded();
     if(this.grounded&&this.vel.y<0)this.vel.y=0;
-    this.syncMesh();
     const state=!this.grounded?(this.vel.y>0?"jump":"fall"):moving?(sprint?"run":"walk"):"idle";
     this.play(state);if(this.mixer)this.mixer.update(dt);
     if(moving)this.mesh.rotation.y=Math.atan2(this.vel.x,this.vel.z);
