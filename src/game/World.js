@@ -123,9 +123,21 @@ export class World{
     for(const object of chunk.objects)this.lod?.remove(object);
     this.scene.remove(chunk.group);
   }
-  raycastFirst(origin,direction,far=500){
-    this.raycaster.set(origin,direction);this.raycaster.far=far;
-    return this.raycaster.intersectObjects(this.scene.children,true)[0]||null;
+  raycastFirst(origin,direction,far=500,exclude=null){
+    this.raycaster.set(origin,direction);
+    this.raycaster.far=far;
+    const roots=this.scene.children.filter(object=>object!==exclude);
+    return this.raycaster.intersectObjects(roots,true)[0]||null;
+  }
+
+  cameraPosition(target,desired,exclude=null,minDistance=1.15){
+    const delta=desired.clone().sub(target);
+    const distance=delta.length();
+    if(distance<.001)return desired.clone();
+    delta.multiplyScalar(1/distance);
+    const hit=this.raycastFirst(target.clone().addScaledVector(delta,.35),delta,distance,exclude);
+    if(!hit)return desired.clone();
+    return target.clone().addScaledVector(delta,Math.max(minDistance,hit.distance-.28));
   }
   update(dt=.016){
     this.world.timestep=Math.min(.033,Math.max(.001,dt));this.world.step();
