@@ -249,8 +249,9 @@ export class Player{
       2.8+Math.sin(this.cameraPitch)*2.3,
       Math.cos(this.cameraYaw)*7
     );
-
-    c.position.lerp(target.clone().add(offset),.14);
+    const desired=target.clone().add(offset);
+    const safe=this.g.world.cameraPosition(target,desired,this.mesh,1.05);
+    c.position.lerp(safe,.2);
     c.lookAt(target);
   }
 
@@ -277,7 +278,9 @@ export class Player{
       3.1+Math.sin(this.cameraPitch)*2,
       Math.cos(this.cameraYaw)*8
     );
-    c.position.lerp(target.clone().add(back),.16);
+    const desired=target.clone().add(back);
+    const safe=this.g.world.cameraPosition(target,desired,this.mesh,1.15);
+    c.position.lerp(safe,.2);
     c.lookAt(target);
   }
 
