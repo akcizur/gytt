@@ -78,13 +78,6 @@ export class CharacterController{
       this.velocity.z*=drag;
     }
 
-    // Keep horizontal motion authoritative even when the collider starts
-    // intersecting a generated building collider.
-    if(Math.abs(this.velocity.x)+Math.abs(this.velocity.z)<0.0001 && moving){
-      this.velocity.x=worldX*speed;
-      this.velocity.z=worldZ*speed;
-    }
-
     if(input.pressed("Space")&&this.grounded)this.velocity.y=this.jumpSpeed;
     this.velocity.y=Math.max(-40,this.velocity.y+this.gravity*dt);
 
