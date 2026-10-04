@@ -9,6 +9,7 @@ export class Input{
     this.move={x:0,y:0,strength:0};
     this.look={x:0,y:0,strength:0};
     this.touchActive=false;
+    this.mouseLook={x:0,y:0};
 
     addEventListener("keydown",e=>{
       if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
@@ -17,6 +18,16 @@ export class Input{
     },{passive:false});
 
     addEventListener("keyup",e=>this.keys.delete(e.code));
+    document.querySelector("#game")?.addEventListener("click",()=>{
+      if(matchMedia("(pointer:fine)").matches && document.pointerLockElement!==document.querySelector("#game")){
+        document.querySelector("#game").requestPointerLock?.();
+      }
+    });
+    addEventListener("mousemove",e=>{
+      if(document.pointerLockElement!==document.querySelector("#game"))return;
+      this.mouseLook.x+=e.movementX;
+      this.mouseLook.y+=e.movementY;
+    });
     addEventListener("blur",()=>this.reset());
     addEventListener("pagehide",()=>this.reset());
     document.addEventListener("visibilitychange",()=>{if(document.hidden)this.reset()});
@@ -116,6 +127,13 @@ export class Input{
     this.move.x=0;this.move.y=0;this.move.strength=0;
     this.look.x=0;this.look.y=0;this.look.strength=0;
     this.touchActive=false;
+    this.mouseLook.x=0;this.mouseLook.y=0;
+  }
+
+  consumeMouseLook(){
+    const x=this.mouseLook.x,y=this.mouseLook.y;
+    this.mouseLook.x=0;this.mouseLook.y=0;
+    return {x,y};
   }
 
   down(code){
