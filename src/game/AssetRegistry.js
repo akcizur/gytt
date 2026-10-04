@@ -4,7 +4,7 @@ const UAL1="https://raw.githubusercontent.com/Barbatos6669/elderforge/main/asset
 const UAL2="https://raw.githubusercontent.com/Barbatos6669/elderforge/main/assets/animations/universal_animation_library_2/UAL2_Standard.glb";
 export const ASSETS={
   root:ROOT,
-  hero:HERO,
+  hero:UAL1,
   animationPacks:{
     locomotion:UAL1,
     extended:UAL2
