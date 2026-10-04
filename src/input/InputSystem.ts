@@ -27,7 +27,6 @@ export class InputSystem {
   private stickMove = { x: 0, y: 0 };
   private stickLook = { x: 0, y: 0 };
   private frameSampled = false;
-  private lastLookTime = performance.now();
 
   constructor(private canvas: HTMLCanvasElement) {
     addEventListener("keydown", e => {
@@ -97,9 +96,10 @@ export class InputSystem {
       const dy = e.clientY - p.y;
 
       if (kind === "move") {
-        this.stickMove.x = deadzone(clamp(dx / radius), 0.08);
-        // Screen Y is inverted: swipe upward means forward.
-        this.stickMove.y = deadzone(clamp(-dy / radius), 0.08);
+        const nextX = deadzone(clamp(dx / radius), 0.08);
+        const nextY = deadzone(clamp(-dy / radius), 0.08);
+        this.stickMove.x = nextX;
+        this.stickMove.y = nextY;
       } else {
         // Camera: responsive at small movements, but capped to prevent jumps.
         this.stickLook.x = clamp(this.stickLook.x + dx * 0.00165, -0.14, 0.14);
@@ -145,13 +145,33 @@ export class InputSystem {
     const keyX = (this.down("KeyD") ? 1 : 0) - (this.down("KeyA") ? 1 : 0);
     const keyY = (this.down("KeyW") ? 1 : 0) - (this.down("KeyS") ? 1 : 0);
 
-    this.actions.moveX = clamp(this.stickMove.x + keyX + gp.moveX);
-    this.actions.moveY = clamp(this.stickMove.y + keyY + gp.moveY);
+    // Keep keyboard/gamepad and touch input deterministic: choose the strongest
+    // source instead of summing unrelated devices, which could create jumps.
+    const digitalX = clamp(keyX);
+    const digitalY = clamp(keyY);
+    const touchMag = Math.hypot(this.stickMove.x, this.stickMove.y);
+    const digitalMag = Math.hypot(digitalX, digitalY);
+    const gamepadMag = Math.hypot(gp.moveX, gp.moveY);
+    if (touchMag >= digitalMag && touchMag >= gamepadMag) {
+      this.actions.moveX = this.stickMove.x;
+      this.actions.moveY = this.stickMove.y;
+    } else if (gamepadMag >= digitalMag) {
+      this.actions.moveX = gp.moveX;
+      this.actions.moveY = gp.moveY;
+    } else {
+      this.actions.moveX = digitalX;
+      this.actions.moveY = digitalY;
+    }
     this.actions.lookX += this.stickLook.x + gp.lookX * 0.090;
     this.actions.lookY += this.stickLook.y + gp.lookY * 0.075;
 
+    // Full-stick auto-run gives mobile users GTA-style continuous locomotion,
+    // while the explicit run button remains available for an immediate sprint.
     this.actions.sprint =
-      this.down("ShiftLeft") || this.down("ShiftRight") || !!gamepad?.buttons[10]?.pressed;
+      this.down("ShiftLeft") ||
+      this.down("ShiftRight") ||
+      !!gamepad?.buttons[10]?.pressed ||
+      (touchMag > 0.88 && digitalMag === 0 && gamepadMag === 0);
     this.actions.crouch =
       this.down("ControlLeft") || this.down("ControlRight") || !!gamepad?.buttons[1]?.pressed;
     this.actions.jump = this.pressed("Space") || !!gamepad?.buttons[0]?.pressed;
