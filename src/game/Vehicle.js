@@ -68,12 +68,7 @@ export class Vehicle{
         new this.T.Vector3(0,1,0),
         this.heading
       );
-      p.body.setNextKinematicTranslation({
-        x:this.pos.x+side.x,
-        y:1,
-        z:this.pos.z+side.z
-      });
-      p.syncMesh();
+      p.teleport(this.pos.x+side.x,1,this.pos.z+side.z);
       p.cameraYaw=this.heading;
       return;
     }
