@@ -146,7 +146,7 @@ export class Player{
           console.warn("Animation skipped",clip.name,error);
         }
       }
-      this.play(this.state||"idle");
+      this.play(this.state||"idle",true);
     }catch(error){
       console.warn("Open animation pack unavailable",url,error);
     }
@@ -158,7 +158,7 @@ export class Player{
     });
   }
 
-  play(wanted){
+  play(wanted,force=false){
     if(!this.mixer)return;
     const keys=Object.keys(this.animations);
     if((wanted==="jump"||wanted==="fall")&&!this.extendedAnimationsRequested){
@@ -177,7 +177,7 @@ export class Player{
     };
 
     const key=keys.find(name=>(aliases[wanted]||[wanted]).some(alias=>name.includes(alias)))||keys[0];
-    if(this.state===wanted&&this.activeAnimationKey===key)return;
+    if(!force&&this.state===wanted&&this.activeAnimationKey===key)return;
 
     Object.entries(this.animations).forEach(([name,action])=>{
       if(name!==key)action.fadeOut(.14);
