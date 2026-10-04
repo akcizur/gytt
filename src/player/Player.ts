@@ -46,9 +46,15 @@ export class Player {
       .addScaledVector(right, a.moveX)
       .addScaledVector(forward, a.moveY);
 
+    // Analog locomotion curve:
+    // light stick = slow walk, middle = jog, full stick = run/sprint.
+    // The curve removes the "all-or-nothing" feeling of a digital stick.
+    const stickPower = inputLength > 0 ? Math.pow(inputLength, 1.65) : 0;
+    const maxSpeed = a.crouch ? 2.8 : a.sprint ? 9.2 : 7.0;
+    const speed = maxSpeed * stickPower;
+
     if (dir.lengthSq() > 1) dir.normalize();
 
-    const speed = a.crouch ? 2.6 : a.sprint ? 8.5 : 4.8;
     const target = dir.multiplyScalar(speed);
     const accel = 20;
 
@@ -110,11 +116,13 @@ export class Player {
       ? this.velocity.y > 0 ? "jump" : "fall"
       : a.crouch
         ? "crouch"
-        : horizontalSpeed < 0.15
+        : inputLength < 0.12
           ? "idle"
-          : horizontalSpeed < 6.2
+          : inputLength < 0.48
             ? "walk"
-            : "run";
+            : inputLength < 0.82
+              ? "jog"
+              : "run";
 
     this.visual.scale.y = 1 + (this.state === "run" ? 0.05 : 0);
   }
