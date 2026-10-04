@@ -232,9 +232,15 @@ export class Player{
       this.cameraReady=true;
     }
 
+    const mouse=input.consumeMouseLook();
+    const hasMouseLook=Math.abs(mouse.x)+Math.abs(mouse.y)>0;
     if(input.touchActive){
       this.cameraYaw-=input.lookX()*CAMERA_SENSITIVITY*dt;
       this.cameraPitch-=input.lookY()*CAMERA_SENSITIVITY*dt;
+      this.cameraPitch=Math.max(-.22,Math.min(.82,this.cameraPitch));
+    }else if(hasMouseLook){
+      this.cameraYaw-=mouse.x*.0032;
+      this.cameraPitch-=mouse.y*.0026;
       this.cameraPitch=Math.max(-.22,Math.min(.82,this.cameraPitch));
     }else{
       const targetYaw=this.mesh.rotation.y;
