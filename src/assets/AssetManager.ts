@@ -25,34 +25,29 @@ export class AssetManager {
     }
   }
 
-  async loadCharacter(url: string): Promise<CharacterAsset> {
-    const gltf = await this.loadGLTF(url);
-    const scene = gltf.scene;
+  async loadCharacter(primaryUrl: string, fallbackUrl?: string): Promise<CharacterAsset> {
+    try {
+      const gltf = await this.loadGLTF(primaryUrl);
+      return this.toCharacterAsset(gltf);
+    } catch (primaryError) {
+      if (!fallbackUrl) throw primaryError;
+      const gltf = await this.loadGLTF(fallbackUrl);
+      return this.toCharacterAsset(gltf);
+    }
+  }
 
+  dispose() {
+    this.cache.clear();
+  }
+
+  private toCharacterAsset(gltf: GLTF): CharacterAsset {
+    const scene = gltf.scene;
     scene.traverse((object) => {
       const mesh = object as T.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     });
-
     return { scene, animations: gltf.animations };
-  }
-
-  dispose() {
-    for (const promise of this.cache.values()) {
-      void promise.then((gltf) => this.disposeScene(gltf.scene));
-    }
-    this.cache.clear();
-  }
-
-  private disposeScene(root: T.Object3D) {
-    root.traverse((object) => {
-      const mesh = object as T.Mesh;
-      if (!mesh.isMesh) return;
-      mesh.geometry.dispose();
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const material of materials) material.dispose();
-    });
   }
 }
