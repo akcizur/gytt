@@ -20,6 +20,8 @@ export class Player{
     this.animations={};
     this.state="";
     this.animationPromise=null;
+    this.extendedAnimationPromise=null;
+    this.extendedAnimationsRequested=false;
     this.cameraYaw=0;
     this.cameraPitch=.28;
     this.cameraReady=false;
@@ -108,39 +110,46 @@ export class Player{
 
   async loadAnimationLibrary(){
     if(this.animationPromise)return this.animationPromise;
-    this.animationPromise=(async()=>{
-      for(const url of ASSETS.animationPacks||[]){
+    this.animationPromise=this.loadAnimationPack(ASSETS.animationPacks?.locomotion);
+    return this.animationPromise;
+  }
+
+  async loadExtendedAnimations(){
+    if(this.extendedAnimationPromise)return this.extendedAnimationPromise;
+    this.extendedAnimationPromise=this.loadAnimationPack(ASSETS.animationPacks?.extended);
+    return this.extendedAnimationPromise;
+  }
+
+  async loadAnimationPack(url){
+    if(!url)return;
+    try{
+      const gltf=await new GLTFLoader().loadAsync(url);
+      let sourceMesh=null;
+      this.traverseFirstSkinned(gltf.scene,result=>{if(!sourceMesh)sourceMesh=result});
+      let targetMesh=null;
+      this.traverseFirstSkinned(this.mesh,result=>{if(!targetMesh)targetMesh=result});
+
+      if(!sourceMesh||!targetMesh||!this.mixer)return;
+
+      for(const clip of gltf.animations){
         try{
-          const gltf=await new GLTFLoader().loadAsync(url);
-          let sourceMesh=null;
-          this.traverseFirstSkinned(gltf.scene,result=>{sourceMesh=result});
-          let targetMesh=null;
-          this.traverseFirstSkinned(this.mesh,result=>{targetMesh=result});
-
-          if(!sourceMesh||!targetMesh||!this.mixer)continue;
-
-          for(const clip of gltf.animations){
-            try{
-              const key=this.normalizeAnimationName(clip.name);
-              if(this.animations[key])continue;
-              const retargeted=retargetClip(
-                targetMesh,
-                sourceMesh,
-                clip,
-                {useFirstFramePosition:true}
-              );
-              this.animations[key]=this.mixer.clipAction(retargeted);
-            }catch(error){
-              console.warn("Animation skipped",clip.name,error);
-            }
-          }
+          const key=this.normalizeAnimationName(clip.name);
+          if(this.animations[key])continue;
+          const retargeted=retargetClip(
+            targetMesh,
+            sourceMesh,
+            clip,
+            {useFirstFramePosition:true}
+          );
+          this.animations[key]=this.mixer.clipAction(retargeted);
         }catch(error){
-          console.warn("Open animation pack unavailable",url,error);
+          console.warn("Animation skipped",clip.name,error);
         }
       }
-      this.play("idle");
-    })();
-    return this.animationPromise;
+      this.play(this.state||"idle");
+    }catch(error){
+      console.warn("Open animation pack unavailable",url,error);
+    }
   }
 
   traverseFirstSkinned(root,callback){
@@ -152,6 +161,10 @@ export class Player{
   play(wanted){
     if(!this.mixer)return;
     const keys=Object.keys(this.animations);
+    if((wanted==="jump"||wanted==="fall")&&!this.extendedAnimationsRequested){
+      this.extendedAnimationsRequested=true;
+      void this.loadExtendedAnimations();
+    }
     if(!keys.length)return;
 
     const aliases={
