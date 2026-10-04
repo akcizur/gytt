@@ -16,6 +16,7 @@ export class Player{
     this.model=null;
     this.mixer=null;
     this.actions={};
+    this.animationState="idle";
     this.current="";
     this.ready=false;
     this.radius=.42;
@@ -108,7 +109,8 @@ export class Player{
     Object.values(this.actions).forEach(a=>{
       if(a!==action)a.fadeOut(.1);
     });
-    action.reset().setEffectiveTimeScale(state==="run"?1.05:1).setEffectiveWeight(1).fadeIn(.1).play();
+    const rate=state==="run"?1.08:state==="walk"?0.82:1;
+    action.reset().setEffectiveTimeScale(rate).setEffectiveWeight(1).fadeIn(.12).play();
     this.current=state;
   }
 
@@ -169,15 +171,18 @@ export class Player{
 
     this.mesh.position.copy(this.pos);
 
+    const speed2=Math.hypot(this.vel.x,this.vel.z);
+    const animationState=!this.grounded
+      ?(this.vel.y>0.15?"jump":"fall")
+      :(speed2<.15?"idle":sprint?"run":"walk");
+    this.play(animationState);
+
     if(moving){
       const targetYaw=Math.atan2(this.vel.x,this.vel.z);
       let d=targetYaw-this.mesh.rotation.y;
       while(d>Math.PI)d-=Math.PI*2;
       while(d<-Math.PI)d+=Math.PI*2;
       this.mesh.rotation.y+=d*Math.min(1,dt*14);
-      this.play(sprint?"run":"walk");
-    }else{
-      this.play("idle");
     }
 
     if(this.mixer)this.mixer.update(dt);
