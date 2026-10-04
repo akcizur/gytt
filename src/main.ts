@@ -1,0 +1,6 @@
+import "./style.css";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { Game } from "./core/Game";
+const app=document.querySelector<HTMLDivElement>("#app")!;
+app.innerHTML=`<canvas id="game"></canvas><div id="boot"><b>GYTT</b><span>INITIALIZING CITY</span><i></i></div><div id="hud"><header><strong>GYTT</strong><span id="state">FREE ROAM</span><span id="fps">-- FPS</span></header><section><small id="missionKind">DEV BUILD</small><strong id="mission">Explore the city</strong></section><footer><span id="speed">0 KM/H</span><span>☆</span></footer></div><div id="mobile"><div id="move" class="stick">MOVE</div><div id="look" class="stick">LOOK</div><div class="actions"><button data-action="jump">JUMP</button><button data-action="crouch">CROUCH</button><button data-action="run">RUN</button><button data-action="interact">USE</button></div></div><div id="crosshair">·</div>`;
+await RAPIER.init(); const game=new Game({canvas:document.querySelector<HTMLCanvasElement>("#game")!,RAPIER}); await game.start(); window.addEventListener("beforeunload",()=>game.dispose());

@@ -1,4 +1,4 @@
-name: GYTT — Build & GitHub Pages
+name: GYTT - Build and GitHub Pages
 on:
   push:
     branches: [main]
@@ -17,25 +17,27 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install
-        run: npm install --no-audit --no-fund
-      - name: Verify syntax
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python validation
         run: |
-          node --check src/main.js
-          node --check src/Game.js
-          node --check src/Input.js
+          python tools/validation/validate_project.py
+          python tools/assets/validate_licenses.py
+          python tools/assets/generate_manifest.py
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Pages
-        uses: actions/configure-pages@v5
-      - name: Upload
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
       - name: Deploy
