@@ -26,6 +26,7 @@ export class InputSystem {
   private activeStick: Record<"move" | "look", number | null> = { move: null, look: null };
   private stickMove = { x: 0, y: 0 };
   private stickLook = { x: 0, y: 0 };
+  private lookVelocity = { x: 0, y: 0 };
   private frameSampled = false;
 
   constructor(private canvas: HTMLCanvasElement) {
@@ -101,10 +102,10 @@ export class InputSystem {
         this.stickMove.x = nextX;
         this.stickMove.y = nextY;
       } else {
-        // Camera: responsive at small movements, but capped to prevent jumps.
-        this.stickLook.x = clamp(this.stickLook.x + dx * 0.00165, -0.14, 0.14);
-        // Screen Y is inverted for orbit control: swipe up looks up.
-        this.stickLook.y = clamp(this.stickLook.y + dy * 0.00135, -0.12, 0.12);
+        // Relative camera drag. Use the movement since the previous pointer
+        // event, not the distance from the initial touch point.
+        this.lookVelocity.x = clamp(dx * 0.0020, -0.12, 0.12);
+        this.lookVelocity.y = clamp(dy * 0.00165, -0.10, 0.10);
         p.x = e.clientX;
         p.y = e.clientY;
       }
@@ -162,6 +163,10 @@ export class InputSystem {
       this.actions.moveX = digitalX;
       this.actions.moveY = digitalY;
     }
+    this.stickLook.x += this.lookVelocity.x;
+    this.stickLook.y += this.lookVelocity.y;
+    this.lookVelocity.x *= 0.72;
+    this.lookVelocity.y *= 0.72;
     this.actions.lookX += this.stickLook.x + gp.lookX * 0.090;
     this.actions.lookY += this.stickLook.y + gp.lookY * 0.075;
 
@@ -188,6 +193,8 @@ export class InputSystem {
     this.actions.lookY = 0;
     this.stickLook.x = 0;
     this.stickLook.y = 0;
+    this.lookVelocity.x = 0;
+    this.lookVelocity.y = 0;
   }
 
   reset() {
@@ -200,6 +207,8 @@ export class InputSystem {
     this.stickMove.y = 0;
     this.stickLook.x = 0;
     this.stickLook.y = 0;
+    this.lookVelocity.x = 0;
+    this.lookVelocity.y = 0;
     this.frameSampled = false;
     Object.assign(this.actions, {
       moveX: 0, moveY: 0, lookX: 0, lookY: 0,
