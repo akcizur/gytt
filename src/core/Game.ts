@@ -4,6 +4,8 @@ import { Player } from "../player/Player";
 import { World } from "../world/World";
 import { AssetManager } from "../assets/AssetManager";
 import { RenderSystem } from "../render/RenderSystem";
+import { EventBus, type GameEventMap } from "./EventBus";
+import { GameBridge } from "./GameBridge";
 
 const FIXED_DT = 1 / 60;
 const MAX_FRAME_DT = 0.1;
@@ -17,6 +19,8 @@ export class Game {
   private readonly player: Player;
   private readonly world: World;
   private readonly assets = new AssetManager();
+  private readonly eventBus = new EventBus<GameEventMap>();
+  private readonly bridge = new GameBridge(this.eventBus);
 
   private last = performance.now();
   private accumulator = 0;
@@ -44,6 +48,8 @@ export class Game {
     this.scene.add(new T.HemisphereLight(0xcfe5ff, 0x253029, 1.2));
     this.scene.background = new T.Color(0x8faabd);
     this.scene.fog = new T.Fog(0x8faabd, 45, 240);
+
+    this.eventBus.on("ui:command", ({ command }) => this.handleUICommand(command));
   }
 
   async start() {
@@ -62,6 +68,7 @@ export class Game {
     if (this.disposed) return;
 
     this.running = true;
+    this.bridge.setStatus("running");
     this.last = performance.now();
     this.fpsTime = this.last;
     this.frames = 0;
@@ -91,6 +98,13 @@ export class Game {
 
     this.cameraUpdate(frameDt);
     this.render.render(this.scene);
+    this.bridge.publishPlayer(
+      this.player.state,
+      Math.hypot(this.player.velocity.x, this.player.velocity.z),
+      this.player.grounded,
+      this.player.position,
+      this.player.yaw,
+    );
     this.hud();
     this.input.endFrame();
     this.raf = requestAnimationFrame(this.loop);
@@ -116,6 +130,23 @@ export class Game {
     this.render.camera.lookAt(target);
   }
 
+  private handleUICommand(command: GameEventMap["ui:command"]["command"]) {
+    if (this.disposed) return;
+    if (command === "pause" || (command === "toggle-pause" && this.running)) {
+      this.running = false;
+      cancelAnimationFrame(this.raf);
+      this.bridge.setStatus("paused");
+      return;
+    }
+
+    if (command === "resume" || (command === "toggle-pause" && !this.running)) {
+      this.running = true;
+      this.last = performance.now();
+      this.bridge.setStatus("running");
+      this.raf = requestAnimationFrame(this.loop);
+    }
+  }
+
   private hud() {
     this.frames++;
     const now = performance.now();
@@ -132,6 +163,10 @@ export class Game {
     }
   }
 
+  getBridge() {
+    return this.bridge;
+  }
+
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
@@ -141,6 +176,7 @@ export class Game {
     this.world.dispose();
     this.input.dispose();
     this.assets.dispose();
+    this.bridge.destroy();
     this.render.dispose();
   }
 }
