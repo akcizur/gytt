@@ -21,7 +21,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -30,8 +29,8 @@ jobs:
           python tools/validation/validate_project.py
           python tools/assets/validate_licenses.py
           python tools/assets/generate_manifest.py
-      - name: Install
-        run: npm ci
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Typecheck
         run: npm run typecheck
       - name: Build
