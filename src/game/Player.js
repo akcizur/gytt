@@ -4,7 +4,9 @@ import { ASSETS } from "./AssetRegistry.js";
 export class Player{
   constructor(g){
     this.g=g;this.T=g.THREE;this.R=g.RAPIER;
-    this.pos=new this.T.Vector3(0,0,10);this.vel=new this.T.Vector3();
+    this.pos=new this.T.Vector3(0,0,10);
+    this.spawn=new this.T.Vector3(0,0,10);
+    this.moveBlend=0;this.vel=new this.T.Vector3();
     this.grounded=false;this.jumpSpeed=6.5;this.mixer=null;this.animations={};this.state="";
   }
   build(){
@@ -18,6 +20,7 @@ export class Player{
     this.collider=this.g.world.world.createCollider(this.R.ColliderDesc.capsule(.55,.42),this.body);
     this.controller=this.g.world.world.createCharacterController(.03);
     this.controller.enableAutostep(.45,.3,true);this.controller.enableSnapToGround(.2);
+    this.controller.setMaxSlopeClimbAngle(Math.PI*0.72);
     this.controller.setApplyImpulsesToDynamicBodies(true);
     this.syncMesh();this.loadModel();
   }
@@ -28,7 +31,8 @@ export class Player{
       const box=new this.T.Box3().setFromObject(model),size=box.getSize(new this.T.Vector3());
       if(size.y>0)model.scale.setScalar(1.8/size.y);
       const scaled=new this.T.Box3().setFromObject(model);model.position.y=-scaled.min.y;
-      this.mesh.clear();this.mesh.add(model);
+      this.mesh.clear();this.mesh.add(model);this.mesh.userData.model=model;
+      model.userData.baseY=model.position.y;
       this.mixer=gltf.animations.length?new this.T.AnimationMixer(model):null;
       for(const clip of gltf.animations)this.animations[clip.name.toLowerCase()]=this.mixer.clipAction(clip);
       this.play("idle");
@@ -49,6 +53,8 @@ export class Player{
     let x=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0);
     let z=(i.down("KeyS")?1:0)-(i.down("KeyW")?1:0);
     const moving=Math.hypot(x,z)>0;
+    const targetBlend=moving?1:0;
+    this.moveBlend+=(targetBlend-this.moveBlend)*Math.min(1,dt*10);
     if(moving){const n=Math.hypot(x,z);x/=n;z/=n}
     const sprint=i.down("ShiftLeft")||i.down("ShiftRight"),speed=sprint?9:5;
     // Camera-relative movement keeps WASD intuitive in third person.
@@ -66,7 +72,22 @@ export class Player{
     if(this.grounded&&this.vel.y<0)this.vel.y=0;
     const state=!this.grounded?(this.vel.y>0?"jump":"fall"):moving?(sprint?"run":"walk"):"idle";
     this.play(state);if(this.mixer)this.mixer.update(dt);
-    if(moving)this.mesh.rotation.y=Math.atan2(this.vel.x,this.vel.z);
+    if(moving){
+      const targetYaw=Math.atan2(this.vel.x,this.vel.z);
+      let delta=targetYaw-this.mesh.rotation.y;
+      while(delta>Math.PI)delta-=Math.PI*2;
+      while(delta<-Math.PI)delta+=Math.PI*2;
+      this.mesh.rotation.y+=delta*Math.min(1,dt*14);
+    }
+    if(this.mesh.userData.model){
+      const model=this.mesh.userData.model;
+      if(!this.mixer){
+        const phase=performance.now()*0.012;
+        const bob=this.moveBlend>0.05?Math.abs(Math.sin(phase*1.7))*0.035:0;
+        model.position.y=model.userData.baseY+bob;
+        model.rotation.x=this.moveBlend*0.025;
+      }
+    }
     this.updateCamera();
   }
   updateCamera(){
@@ -80,5 +101,5 @@ export class Player{
     c.position.lerp(target.clone().add(back),.18);c.lookAt(target);
   }
   syncMesh(){const t=this.body.translation();this.pos.set(t.x,t.y-1,t.z);this.mesh.position.copy(this.pos)}
-  reset(){this.body.setNextKinematicTranslation({x:0,y:1,z:10});this.vel.set(0,0,0);this.grounded=false;this.syncMesh();this.mesh.visible=true;this.mesh.rotation.y=0}
+  reset(){this.body.setNextKinematicTranslation({x:this.spawn.x,y:1,z:this.spawn.z});this.vel.set(0,0,0);this.grounded=false;this.syncMesh();this.mesh.visible=true;this.mesh.rotation.y=0}
 }
