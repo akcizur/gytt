@@ -5,7 +5,10 @@ const UAL2="https://raw.githubusercontent.com/Barbatos6669/elderforge/main/asset
 export const ASSETS={
   root:ROOT,
   hero:HERO,
-  animationPacks:[UAL1,UAL2],
+  animationPacks:{
+    locomotion:UAL1,
+    extended:UAL2
+  },
   road:(name)=>ROOT+"/city-kit-roads/"+name+".glb",
   building:(name)=>ROOT+"/city-kit-suburban/"+name+".glb",
   commercial:(name)=>ROOT+"/city-kit-commercial/"+name+".glb",
