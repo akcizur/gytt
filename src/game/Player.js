@@ -110,13 +110,19 @@ export class Player{
   update(dt){
     if(this.g.vehicle.driver){this.followVehicle();if(this.mixer)this.mixer.update(dt);return}
     const i=this.g.input,T=this.T;
-    let x=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0);
-    let z=(i.down("KeyS")?1:0)-(i.down("KeyW")?1:0);
-    const moving=Math.hypot(x,z)>0;
+    let x=i.axisX();
+    let z=-i.axisY();
+    if(Math.hypot(x,z)<0.001){
+      x=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0);
+      z=(i.down("KeyS")?1:0)-(i.down("KeyW")?1:0);
+    }
+    const inputMagnitude=Math.min(1,Math.hypot(x,z));
+    const moving=inputMagnitude>0.08;
     const targetBlend=moving?1:0;
     this.moveBlend+=(targetBlend-this.moveBlend)*Math.min(1,dt*10);
     if(moving){const n=Math.hypot(x,z);x/=n;z/=n}
-    const sprint=i.down("ShiftLeft")||i.down("ShiftRight"),speed=sprint?9:5;
+    const sprint=i.down("ShiftLeft")||i.down("ShiftRight");
+    const maxSpeed=(sprint?9:5)*Math.max(.35,inputMagnitude);
     // Camera-relative movement keeps WASD intuitive in third person.
     const camera=this.g.world.camera;
     const yaw=Math.atan2(camera.position.x-this.pos.x,camera.position.z-this.pos.z);
@@ -124,8 +130,8 @@ export class Player{
       this.g.world.cameraYaw=(this.g.world.cameraYaw||0)+this.g.input.lookX()*dt*2.8;
     }
     const wx=x*Math.cos(yaw)+z*Math.sin(yaw),wz=-x*Math.sin(yaw)+z*Math.cos(yaw);
-    this.vel.x+=(wx*speed-this.vel.x)*Math.min(1,dt*12);
-    this.vel.z+=(wz*speed-this.vel.z)*Math.min(1,dt*12);
+    this.vel.x+=(wx*maxSpeed-this.vel.x)*Math.min(1,dt*12);
+    this.vel.z+=(wz*maxSpeed-this.vel.z)*Math.min(1,dt*12);
     if(!moving){const drag=Math.pow(.02,dt);this.vel.x*=drag;this.vel.z*=drag}
     if(i.pressed("Space")&&this.grounded)this.vel.y=this.jumpSpeed;
     this.vel.y-=18*dt;
@@ -156,8 +162,19 @@ export class Player{
   }
   updateCamera(){
     const T=this.T,c=this.g.world.camera,target=this.pos.clone().add(new T.Vector3(0,1.2,0));
-    const yaw=this.g.world.cameraYaw||this.mesh.rotation.y;
-    const back=new T.Vector3(0,2.8,7).applyAxisAngle(new T.Vector3(0,1,0),yaw);
+    const input=this.g.input;
+    const lookScale=input.touchActive?2.6:0;
+    if(input.touchActive){
+      this.g.world.cameraYaw=(this.g.world.cameraYaw||0)-input.lookX()*lookScale*.016;
+      this.g.world.cameraPitch=(this.g.world.cameraPitch||.28)-input.lookY()*lookScale*.016;
+      this.g.world.cameraPitch=Math.max(-.15,Math.min(.8,this.g.world.cameraPitch));
+    }
+    const yaw=this.g.world.cameraYaw??this.mesh.rotation.y;
+    const pitch=this.g.world.cameraPitch??.28;
+    const back=new T.Vector3(0,2.8,7);
+    back.y=2.8+Math.sin(pitch)*2.2;
+    back.z=7*Math.cos(pitch);
+    back.applyAxisAngle(new T.Vector3(0,1,0),yaw);
     c.position.lerp(target.clone().add(back),.14);c.lookAt(target);
   }
   followVehicle(){
