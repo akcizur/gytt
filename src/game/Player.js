@@ -266,11 +266,16 @@ export class Player{
     const v=this.g.vehicle;
     const c=this.g.world.camera;
     const input=this.g.input;
+    const mouse=input.consumeMouseLook();
     const target=v.pos.clone().add(new T.Vector3(0,1.4,0));
 
     if(input.look.strength>0){
       this.cameraYaw-=input.lookX()*CAMERA_SENSITIVITY*dt;
       this.cameraPitch-=input.lookY()*CAMERA_SENSITIVITY*dt;
+      this.cameraPitch=Math.max(-.18,Math.min(.7,this.cameraPitch));
+    }else if(Math.abs(mouse.x)+Math.abs(mouse.y)>0){
+      this.cameraYaw-=mouse.x*.0032;
+      this.cameraPitch-=mouse.y*.0026;
       this.cameraPitch=Math.max(-.18,Math.min(.7,this.cameraPitch));
     }else{
       let delta=v.heading-this.cameraYaw;
