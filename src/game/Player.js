@@ -152,7 +152,17 @@ export class Player{
       land:["land","landing","idle"]
     };
 
-    const key=keys.find(name=>(aliases[wanted]||[wanted]).some(alias=>name.includes(alias)))||keys[0];
+    const preferred={
+      idle:["idle_loop","idle"],
+      walk:["walk_loop","walk"],
+      run:["sprint_loop","jog_fwd_loop","run"],
+      jump:["jump_start","jump_loop","jump"],
+      fall:["jump_loop","fall"],
+      land:["jump_land","land"]
+    }[wanted]||[wanted];
+    const key=keys.find(name=>preferred.some(alias=>name===alias||name.includes(alias)))
+      ||keys.find(name=>(aliases[wanted]||[wanted]).some(alias=>name.includes(alias)))
+      ||keys[0];
     if(!force&&this.state===wanted&&this.activeAnimationKey===key)return;
 
     Object.entries(this.animations).forEach(([name,action])=>{
