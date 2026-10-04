@@ -18,6 +18,8 @@ export class Input{
 
     addEventListener("keyup",e=>this.keys.delete(e.code));
     addEventListener("blur",()=>this.reset());
+    addEventListener("pagehide",()=>this.reset());
+    document.addEventListener("visibilitychange",()=>{if(document.hidden)this.reset()});
 
     this.bindTouchButtons();
     this.bindJoysticks();
