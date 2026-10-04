@@ -99,7 +99,7 @@ export class Player {
     const a = this.input.sample();
 
     const forward = new T.Vector3(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
-    const right = new T.Vector3(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
+    const right = new T.Vector3(Math.cos(cameraYaw), 0, Math.sin(cameraYaw));
 
     const dir = new T.Vector3()
       .addScaledVector(right, a.moveX)
