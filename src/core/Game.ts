@@ -15,6 +15,7 @@ export class Game {
   private readonly physics: any;
   private readonly input: InputSystem;
   private readonly player: Player;
+  private readonly world: World;
   private readonly assets = new AssetManager();
 
   private last = performance.now();
@@ -31,8 +32,7 @@ export class Game {
     this.render = new RenderSystem(canvas);
     this.physics = new RAPIER.World({ x: 0, y: -18, z: 0 });
     this.input = new InputSystem(canvas);
-
-    new World(this.scene, RAPIER, this.physics);
+    this.world = new World(this.scene, RAPIER, this.physics);
     this.player = new Player(RAPIER, this.physics, this.input);
     this.scene.add(this.player.object);
 
@@ -42,20 +42,24 @@ export class Game {
     sun.shadow.mapSize.set(2048, 2048);
     this.scene.add(sun);
     this.scene.add(new T.HemisphereLight(0xcfe5ff, 0x253029, 1.2));
-
     this.scene.background = new T.Color(0x8faabd);
     this.scene.fog = new T.Fog(0x8faabd, 45, 240);
   }
 
   async start() {
     if (this.disposed || this.running) return;
+
+    const localUrl = new URL("assets/characters/RobotExpressive.glb", import.meta.env.BASE_URL).href;
+    const remoteUrl = "https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb";
+
     try {
-      const url = new URL("assets/characters/RobotExpressive.glb", import.meta.env.BASE_URL).href;
-      const character = await this.assets.loadCharacter(url);
+      const character = await this.assets.loadCharacter(localUrl, remoteUrl);
       this.player.attachCharacter(character);
     } catch (error) {
-      console.warn("GYTT character asset unavailable; using physics fallback.", error);
+      console.warn("Character asset unavailable; procedural fallback remains active.", error);
     }
+
+    if (this.disposed) return;
 
     this.running = true;
     this.last = performance.now();
@@ -67,7 +71,7 @@ export class Game {
   }
 
   private loop = (now: number) => {
-    if (!this.running) return;
+    if (!this.running || this.disposed) return;
 
     const frameDt = Math.min(MAX_FRAME_DT, Math.max(0, (now - this.last) / 1000));
     this.last = now;
@@ -81,12 +85,10 @@ export class Game {
       steps++;
     }
 
-    // Prevent a background-tab resume from creating a physics spiral.
     if (steps === MAX_STEPS_PER_FRAME && this.accumulator >= FIXED_DT) {
       this.accumulator = 0;
     }
 
-    // Camera/render stay on the display clock; simulation stays fixed-step.
     this.cameraUpdate(frameDt);
     this.render.render(this.scene);
     this.hud();
@@ -117,7 +119,6 @@ export class Game {
   private hud() {
     this.frames++;
     const now = performance.now();
-
     if (now - this.fpsTime > 500) {
       const el = document.querySelector("#fps");
       if (el) el.textContent = Math.round(this.frames * 1000 / (now - this.fpsTime)) + " FPS";
@@ -137,6 +138,8 @@ export class Game {
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.player.dispose();
+    this.world.dispose();
+    this.input.dispose();
     this.assets.dispose();
     this.render.dispose();
   }
