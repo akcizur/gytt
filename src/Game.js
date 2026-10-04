@@ -30,7 +30,7 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
   addBuilding(x,z){const w=18+(Math.abs(x*z)%8),d=18+(Math.abs(x+z)%8),h=8+(Math.abs(x*7+z*3)%32);const m=this.box(w,h,d,0x66727b);m.position.set(x,h/2,z);m.userData.proceduralBuilding=true;this.scene.add(m);this.colliderBox(x,h/2,z,w,h,d);if(h>22)for(let y=5;y<h-2;y+=5){const strip=this.box(w*.72,.35,.08,0x9eb5b8);strip.position.set(x,y,z-d/2-.05);strip.castShadow=false;this.scene.add(strip)}}
   addTree(x,z){const g=new this.T.Group(),trunk=this.box(1.2,4,1.2,0x5b4430),crown=new this.T.Mesh(new this.T.IcosahedronGeometry(3.5,1),this.mat(0x31583e));trunk.position.y=2;crown.position.y=5.5;crown.castShadow=true;g.add(trunk,crown);g.position.set(x,0,z);this.scene.add(g)}
   addLandmark(x,z){const p=this.box(16,1,16,0x6d747b);p.position.set(x,.5,z);this.scene.add(p);const ring=new this.T.Mesh(new this.T.TorusGeometry(6,.18,10,48),this.mat(0xd9b25d,.4,.5));ring.rotation.x=Math.PI/2;ring.position.set(x,1.1,z);this.scene.add(ring)}
-  buildPlayer(){this.player={pos:new this.T.Vector3(0,1,8),vel:new this.T.Vector3(),yaw:0,grounded:false,health:100,model:new this.T.Group(),action:"idle",mixer:null,clips:{},bones:{}};const g=this.player.model;g.userData.noCameraCollision=true;const body=this.box(1,1.7,.55,0x3e6fb4),head=new this.T.Mesh(new this.T.SphereGeometry(.38,16,12),this.mat(0xc98d6b));body.position.y=1.25;head.position.y=2.3;g.add(body,head);g.position.copy(this.player.pos);this.scene.add(g);this.player.body=this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.player.pos.x,this.player.pos.y+.7,this.player.pos.z));this.player.collider=this.world.createCollider(this.R.ColliderDesc.capsule(.7,.38),this.player.body);this.player.controller=this.world.createCharacterController(.05);this.player.controller.enableAutostep(.6,.25,true);this.player.controller.enableSnapToGround(.3);this.player.controller.setApplyImpulsesToDynamicBodies?.(false);this.loadRiggedPlayer()}
+  buildPlayer(){this.player={pos:new this.T.Vector3(0,1,8),vel:new this.T.Vector3(),yaw:0,grounded:false,health:100,model:new this.T.Group(),action:"idle",mixer:null,clips:{},bones:{},animationLock:false,animationState:"idle"};const g=this.player.model;g.userData.noCameraCollision=true;const body=this.box(1,1.7,.55,0x3e6fb4),head=new this.T.Mesh(new this.T.SphereGeometry(.38,16,12),this.mat(0xc98d6b));body.position.y=1.25;head.position.y=2.3;g.add(body,head);g.position.copy(this.player.pos);this.scene.add(g);this.player.body=this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.player.pos.x,this.player.pos.y+.7,this.player.pos.z));this.player.collider=this.world.createCollider(this.R.ColliderDesc.capsule(.7,.38),this.player.body);this.player.controller=this.world.createCharacterController(.05);this.player.controller.enableAutostep(.6,.25,true);this.player.controller.enableSnapToGround(.3);this.player.controller.setApplyImpulsesToDynamicBodies?.(false);this.loadRiggedPlayer()}
   loadRiggedPlayer(){const url="https://raw.githubusercontent.com/programasweights/avatar/main/public/assets/character.glb";this.gltfLoader.load(url,gltf=>{const rig=gltf.scene;const box=new this.T.Box3().setFromObject(rig),size=box.getSize(new this.T.Vector3());const scale=2.35/Math.max(size.y,0.001);rig.scale.setScalar(scale);const scaled=new this.T.Box3().setFromObject(rig),min=scaled.min.y;rig.position.y=-min;rig.traverse(o=>{o.castShadow=true;o.receiveShadow=true});rig.userData.noCameraCollision=true;this.player.model.clear();this.player.model.add(rig);this.player.rig=rig;this.player.bones={hips:rig.getObjectByName("Hips"),spine:rig.getObjectByName("Spine"),head:rig.getObjectByName("Head"),lUpper:rig.getObjectByName("LeftUpperLeg"),rUpper:rig.getObjectByName("RightUpperLeg"),lLower:rig.getObjectByName("LeftLowerLeg"),rLower:rig.getObjectByName("RightLowerLeg"),lArm:rig.getObjectByName("LeftUpperArm"),rArm:rig.getObjectByName("RightUpperArm")};this.show("CC0 RIGGED PLAYER READY");this.loadAnimationLibrary(rig)},undefined,()=>this.show("Rigged model unavailable — fallback active"))}
   async loadAnimationLibrary(rig){
     const urls=[
@@ -75,6 +75,13 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
       this.player.actions={};
       for(const clip of clips)this.player.actions[clip.name]=this.player.mixer.clipAction(clip);
       this.player.animationNames=clips.map(a=>a.name);
+      this.player.mixer.addEventListener("finished",event=>{
+        if(event.action===this.player.currentAction){
+          this.player.animationLock=false;
+          this.player.currentAction=null;
+          this.player.currentAnimation=null;
+        }
+      });
       this.show("UAL1 + UAL2 gameplay animations ready");
       this.setPlayerAnimation("idle")
     }catch{
@@ -106,19 +113,25 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
     if(!p.mixer||!p.animations?.length)return;
     const clip=this.resolveAnimation(state)||this.resolveAnimation("idle");
     if(!clip)return;
-    if(p.currentAnimation===clip.name)return;
     const next=p.actions[clip.name];
     if(!next)return;
     const oneShot=["jump","land"].includes(state);
+    if(p.animationLock&&!oneShot)return;
+    const speed=Math.hypot(p.vel.x,p.vel.z);
+    const same=p.currentAnimation===clip.name;
+    const speedScale=state==="walk"?clamp(speed/4.8,.72,1.12):state==="run"?clamp(speed/8.5,.72,1.1):1;
+    next.setEffectiveTimeScale(speedScale);
+    next.setEffectiveWeight(1);
+    if(same)return;
     next.enabled=true;
     next.setLoop(oneShot?this.T.LoopOnce:this.T.LoopRepeat);
     next.clampWhenFinished=oneShot;
-    if(p.currentAction)p.currentAction.fadeOut(oneShot?.06:.12);
+    if(p.currentAction&&p.currentAction!==next)p.currentAction.fadeOut(oneShot?.06:.12);
     next.reset().fadeIn(oneShot?.06:.12).play();
-    next.setEffectiveWeight(1);
     p.currentAction=next;
     p.currentAnimation=clip.name;
     p.animationState=state;
+    p.animationLock=oneShot;
   }
   buildVehicle(){this.vehicle={pos:new this.T.Vector3(0,0,15),heading:0,speed:0,driver:false,group:new this.T.Group(),assetSource:null};const g=this.vehicle.group;g.userData.noCameraCollision=true;const base=this.box(2.2,.65,4,0xa51f2c),cabin=this.box(1.75,.65,1.9,0x28343e);base.position.y=.65;cabin.position.set(0,1.18,-.15);g.add(base,cabin);for(const x of [-.95,.95])for(const z of [-1.35,1.35]){const w=new this.T.Mesh(new this.T.CylinderGeometry(.34,.34,.2,16),this.mat(0x111318,.7));w.rotation.z=Math.PI/2;w.position.set(x,.35,z);g.add(w)}g.position.copy(this.vehicle.pos);this.scene.add(g);this.vehicle.body=this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,.45,15));this.vehicle.collider=this.world.createCollider(this.R.ColliderDesc.cuboid(1.1,.45,2),this.vehicle.body)}
   buildTraffic(){this.traffic=[];const colors=[0x3b82f6,0xeab308,0x22c55e,0xef4444,0xffffff];for(let i=0;i<18;i++){const axis=i%2?"x":"z",lane=(i%5-2)*3.2,p=i*23%360-180,car=this.box(1.5,.55,3,colors[i%colors.length]);car.position.y=.58;this.scene.add(car);this.traffic.push({mesh:car,axis,lane,p,speed:7+(i%5)*1.5})}}
