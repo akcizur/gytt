@@ -106,11 +106,14 @@ export class Player{
     const action=this.find(map[state]||[state]);
     if(!action)return;
     if(!force&&this.current===state)return;
-    Object.values(this.actions).forEach(a=>{
-      if(a!==action)a.fadeOut(.1);
-    });
-    const rate=state==="run"?1.08:state==="walk"?0.82:1;
-    action.reset().setEffectiveTimeScale(rate).setEffectiveWeight(1).fadeIn(.12).play();
+    const previous=this.current?this.actions[this.current]:null;
+    if(previous&&previous!==action){
+      action.reset().setEffectiveWeight(1);
+      action.setEffectiveTimeScale(1);
+      action.crossFadeFrom(previous,.14,true).play();
+    }else{
+      action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+    }
     this.current=state;
   }
 
@@ -174,8 +177,18 @@ export class Player{
     const speed2=Math.hypot(this.vel.x,this.vel.z);
     const animationState=!this.grounded
       ?(this.vel.y>0.15?"jump":"fall")
-      :(speed2<.15?"idle":sprint?"run":"walk");
+      :(speed2<.12?"idle":speed2<6.2?"walk":"run");
     this.play(animationState);
+
+    // Synchronize locomotion animation speed with actual world velocity.
+    // This keeps foot cadence tied to movement instead of keyboard state.
+    const locomotion=this.actions[this.current];
+    if(locomotion&&this.grounded&&(animationState==="walk"||animationState==="run")){
+      const base=animationState==="run"?7.0:3.2;
+      locomotion.setEffectiveTimeScale(
+        Math.max(.55,Math.min(1.55,speed2/Math.max(.01,base)))
+      );
+    }
 
     if(moving){
       const targetYaw=Math.atan2(this.vel.x,this.vel.z);
