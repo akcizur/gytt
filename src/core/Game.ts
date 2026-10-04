@@ -12,8 +12,9 @@ const MAX_FRAME_DT = 0.1;
 const MAX_STEPS_PER_FRAME = 5;
 
 const resolvePublicAsset = (path: string) => {
-  const baseUrl = new URL(import.meta.env.BASE_URL, document.baseURI);
-  return new URL(path.replace(/^\/+/, ""), baseUrl).href;
+  const root = import.meta.env.DEV ? "/" : import.meta.env.BASE_URL;
+  const base = root.endsWith("/") ? root : `${root}/`;
+  return `${window.location.origin}${base}${path.replace(/^\/+/, "")}`;
 };
 
 export class Game {
