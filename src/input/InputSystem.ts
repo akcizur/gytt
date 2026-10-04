@@ -85,6 +85,9 @@ export class InputSystem {
       e.preventDefault();
       this.activeStick[kind] = e.pointerId;
       this.pointers.set(e.pointerId, { kind, x: e.clientX, y: e.clientY });
+      el.classList.add("active");
+      el.style.setProperty("--sx", "0");
+      el.style.setProperty("--sy", "0");
       el.setPointerCapture?.(e.pointerId);
     }, { passive: false });
 
@@ -101,11 +104,15 @@ export class InputSystem {
         const nextY = deadzone(clamp(-dy / radius), 0.08);
         this.stickMove.x = nextX;
         this.stickMove.y = nextY;
+        el.style.setProperty("--sx", String(nextX));
+        el.style.setProperty("--sy", String(-nextY));
       } else {
         // Relative camera drag. Use the movement since the previous pointer
         // event, not the distance from the initial touch point.
         this.lookVelocity.x = clamp(dx * 0.0020, -0.12, 0.12);
         this.lookVelocity.y = clamp(dy * 0.00165, -0.10, 0.10);
+        el.style.setProperty("--sx", String(clamp(dx / radius, -1, 1)));
+        el.style.setProperty("--sy", String(clamp(dy / radius, -1, 1)));
         p.x = e.clientX;
         p.y = e.clientY;
       }
@@ -114,6 +121,9 @@ export class InputSystem {
     const end = (e: PointerEvent) => {
       if (!this.pointers.delete(e.pointerId)) return;
       this.activeStick[kind] = null;
+      el.classList.remove("active");
+      el.style.setProperty("--sx", "0");
+      el.style.setProperty("--sy", "0");
       if (kind === "move") {
         this.stickMove.x = 0;
         this.stickMove.y = 0;
