@@ -202,7 +202,7 @@ export class Player{
     const i=this.g.input;
     const axes=this.getMoveAxes();
     const moving=axes.magnitude>MOVE_DEAD_ZONE;
-    this.moveBlend+=(moving?1:0-this.moveBlend)*Math.min(1,dt*10);
+    this.moveBlend+=((moving?1:0)-this.moveBlend)*Math.min(1,dt*10);
 
     let x=axes.x;
     let z=-axes.y;
@@ -331,6 +331,7 @@ export class Player{
   }
 
   reset(){
+    this.mesh.rotation.y=0;
     this.body.setNextKinematicTranslation({
       x:this.spawn.x,
       y:1,
@@ -339,9 +340,8 @@ export class Player{
     this.vel.set(0,0,0);
     this.grounded=false;
     this.cameraPitch=.28;
-    this.cameraYaw=this.mesh.rotation.y;
+    this.cameraYaw=0;
     this.syncMesh();
     this.mesh.visible=true;
-    this.mesh.rotation.y=0;
   }
 }
