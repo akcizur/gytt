@@ -4,12 +4,11 @@ export type Actions = {
   sprint: boolean; jump: boolean; crouch: boolean; roll: boolean; interact: boolean;
 };
 
-const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+const clamp = (v: number, min = -1, max = 1) => Math.max(min, Math.min(max, v));
 const deadzone = (v: number, zone = 0.08) => {
   const a = Math.abs(v);
   if (a <= zone) return 0;
   const normalized = (a - zone) / (1 - zone);
-  // Smooth the first part of the stick for precision without feeling sluggish.
   const curved = normalized * normalized * (3 - 2 * normalized);
   return Math.sign(v) * curved;
 };
@@ -107,12 +106,10 @@ export class InputSystem {
         el.style.setProperty("--sx", String(nextX));
         el.style.setProperty("--sy", String(-nextY));
       } else {
-        // Relative camera drag. Use the movement since the previous pointer
-        // event, not the distance from the initial touch point.
         this.lookVelocity.x = clamp(dx * 0.0020, -0.12, 0.12);
         this.lookVelocity.y = clamp(dy * 0.00165, -0.10, 0.10);
-        el.style.setProperty("--sx", String(clamp(dx / radius, -1, 1)));
-        el.style.setProperty("--sy", String(clamp(dy / radius, -1, 1)));
+        el.style.setProperty("--sx", String(clamp(dx / radius)));
+        el.style.setProperty("--sy", String(clamp(dy / radius)));
         p.x = e.clientX;
         p.y = e.clientY;
       }
@@ -156,13 +153,12 @@ export class InputSystem {
     const keyX = (this.down("KeyD") ? 1 : 0) - (this.down("KeyA") ? 1 : 0);
     const keyY = (this.down("KeyW") ? 1 : 0) - (this.down("KeyS") ? 1 : 0);
 
-    // Keep keyboard/gamepad and touch input deterministic: choose the strongest
-    // source instead of summing unrelated devices, which could create jumps.
     const digitalX = clamp(keyX);
     const digitalY = clamp(keyY);
     const touchMag = Math.hypot(this.stickMove.x, this.stickMove.y);
     const digitalMag = Math.hypot(digitalX, digitalY);
     const gamepadMag = Math.hypot(gp.moveX, gp.moveY);
+
     if (touchMag >= digitalMag && touchMag >= gamepadMag) {
       this.actions.moveX = this.stickMove.x;
       this.actions.moveY = this.stickMove.y;
@@ -173,6 +169,7 @@ export class InputSystem {
       this.actions.moveX = digitalX;
       this.actions.moveY = digitalY;
     }
+
     this.stickLook.x += this.lookVelocity.x;
     this.stickLook.y += this.lookVelocity.y;
     this.lookVelocity.x *= 0.72;
@@ -180,13 +177,12 @@ export class InputSystem {
     this.actions.lookX += this.stickLook.x + gp.lookX * 0.090;
     this.actions.lookY += this.stickLook.y + gp.lookY * 0.075;
 
-    // Full-stick auto-run gives mobile users GTA-style continuous locomotion,
-    // while the explicit run button remains available for an immediate sprint.
+    const mobileAutoRun = touchMag > 0.88 && digitalMag === 0 && gamepadMag === 0;
     this.actions.sprint =
       this.down("ShiftLeft") ||
       this.down("ShiftRight") ||
       !!gamepad?.buttons[10]?.pressed ||
-      (touchMag > 0.88 && digitalMag === 0 && gamepadMag === 0);
+      mobileAutoRun;
     this.actions.crouch =
       this.down("ControlLeft") || this.down("ControlRight") || !!gamepad?.buttons[1]?.pressed;
     this.actions.jump = this.pressed("Space") || !!gamepad?.buttons[0]?.pressed;
