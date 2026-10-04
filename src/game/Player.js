@@ -18,6 +18,9 @@ export class Player{
     this.actions={};
     this.animationState="idle";
     this.current="";
+    this.animationState="idle";
+    this.wasGrounded=true;
+    this.landUntil=0;
     this.ready=false;
     this.radius=.42;
     this.height=1.8;
@@ -112,7 +115,14 @@ export class Player{
       action.setEffectiveTimeScale(1);
       action.crossFadeFrom(previous,.14,true).play();
     }else{
-      action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+        action.reset().setEffectiveWeight(1).setEffectiveTimeScale(1).play();
+    }
+    if(state==="land"){
+      action.setLoop(this.T.LoopOnce,1);
+      action.clampWhenFinished=true;
+    }else{
+      action.setLoop(this.T.LoopRepeat,Infinity);
+      action.clampWhenFinished=false;
     }
     this.current=state;
   }
@@ -167,7 +177,7 @@ export class Player{
     };
 
     // Apply immediately; the render transform never waits for the physics step.
-    this.body.setTranslation(next,true);
+    this.body.setNextKinematicTranslation(next);
     this.pos.set(next.x,next.y-1,next.z);
     this.grounded=this.controller.computedGrounded()||next.y<=1.02;
     if(this.grounded&&this.vel.y<0)this.vel.y=0;
@@ -175,10 +185,19 @@ export class Player{
     this.mesh.position.copy(this.pos);
 
     const speed2=Math.hypot(this.vel.x,this.vel.z);
-    const animationState=!this.grounded
+    const landed=!this.wasGrounded&&this.grounded;
+    let animationState=!this.grounded
       ?(this.vel.y>0.15?"jump":"fall")
       :(speed2<.12?"idle":speed2<6.2?"walk":"run");
+    if(landed&&this.find(["jump_land","land"])){
+      animationState="land";
+      this.landUntil=performance.now()+260;
+    }else if(performance.now()<this.landUntil){
+      animationState="land";
+    }
     this.play(animationState);
+    this.animationState=animationState;
+    this.wasGrounded=this.grounded;
 
     // Synchronize locomotion animation speed with actual world velocity.
     // This keeps foot cadence tied to movement instead of keyboard state.
