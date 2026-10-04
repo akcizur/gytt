@@ -3,11 +3,82 @@
 #fatal[hidden]{display:none}
 
 @media(max-width:700px){
-  #touch{display:block;position:fixed;inset:0;z-index:20;pointer-events:none}
-  .joy-zone{position:absolute;bottom:18px;width:42vw;height:42vw;max-width:190px;max-height:190px;pointer-events:auto;touch-action:none}
-  #joy-left{left:12px}.joy-zone#joy-right{right:12px}
-  #touch .actions{position:absolute;right:18px;bottom:205px;display:flex;flex-direction:column;gap:4px;pointer-events:none}
-  #touch .actions button{pointer-events:auto;width:48px;height:48px;margin:0;font-size:10px;background:#080b0dbb}
+  html,body{
+    overscroll-behavior:none;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-touch-callout:none;
+  }
+  #touch{
+    display:block;
+    position:fixed;
+    inset:0;
+    z-index:20;
+    pointer-events:none;
+    padding:
+      0
+      env(safe-area-inset-right)
+      env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+  }
+  .joy-zone{
+    position:absolute;
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    width:min(43vw,190px);
+    height:min(43vw,190px);
+    pointer-events:auto;
+    touch-action:none;
+  }
+  #joy-left{left:8px}
+  #joy-right{right:8px}
+  .joy-zone>span{
+    position:absolute;
+    left:50%;
+    top:calc(50% + 68px);
+    transform:translateX(-50%);
+    font-size:8px;
+    letter-spacing:.16em;
+    opacity:.28;
+    pointer-events:none;
+  }
+  #touch .actions{
+    position:absolute;
+    left:50%;
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    transform:translate(-50%,-190px);
+    display:grid;
+    grid-template-columns:repeat(2,52px);
+    gap:7px;
+    pointer-events:none;
+  }
+  #touch .actions button{
+    pointer-events:auto;
+    width:52px;
+    height:52px;
+    margin:0;
+    border:1px solid #ffffff22;
+    background:#080b0dcc;
+    font-size:9px;
+    backdrop-filter:blur(12px);
+  }
+  #touch .actions button:active{transform:scale(.94)}
   .nipple{z-index:30}
+  .nipple .back{
+    opacity:.9 !important;
+    border:1px solid #ffffff10;
+  }
+  .nipple .front{box-shadow:0 3px 20px #0006}
   #game{touch-action:none}
+}
+
+@media(max-width:380px){
+  .joy-zone{
+    width:40vw;
+    height:40vw;
+  }
+  #touch .actions{
+    transform:translate(-50%,-168px);
+    grid-template-columns:repeat(2,48px);
+  }
+  #touch .actions button{width:48px;height:48px}
 }
