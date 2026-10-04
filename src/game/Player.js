@@ -20,7 +20,7 @@ export class Player{
     this.actions={};
     this.animationState="idle";
     this.current="";
-    this.animationState="idle";
+    this.currentAction=null;
     this.wasGrounded=true;
     this.landUntil=0;
     this.ready=false;
@@ -110,7 +110,7 @@ export class Player{
     const action=this.find(map[state]||[state]);
     if(!action)return;
     if(!force&&this.current===state)return;
-    const previous=this.current?this.actions[this.current]:null;
+    const previous=this.currentAction;
     if(previous&&previous!==action){
       action.reset().setEffectiveWeight(1);
       action.setEffectiveTimeScale(1);
@@ -126,18 +126,7 @@ export class Player{
       action.clampWhenFinished=false;
     }
     this.current=state;
-  }
-
-  axes(){
-    const i=this.g.input;
-    let x=i.axisX(), y=i.axisY();
-    if(Math.hypot(x,y)<MOVE_DEAD){
-      x=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0);
-      y=(i.down("KeyW")?1:0)-(i.down("KeyS")?1:0);
-    }
-    const len=Math.hypot(x,y);
-    if(len>1){x/=len;y/=len}
-    return {x,y,magnitude:Math.min(1,len)};
+    this.currentAction=action;
   }
 
   update(dt){
