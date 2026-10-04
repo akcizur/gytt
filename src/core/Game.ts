@@ -22,7 +22,6 @@ export class Game {
   private raf = 0;
   private running = false;
   private disposed = false;
-  private lastRenderedPlayer = new T.Vector3();
   private yaw = 0;
   private pitch = -0.2;
   private frames = 0;
@@ -62,7 +61,6 @@ export class Game {
     this.last = performance.now();
     this.fpsTime = this.last;
     this.frames = 0;
-    this.lastRenderedPlayer.copy(this.player.position);
     this.accumulator = 0;
     document.querySelector("#boot")?.remove();
     this.raf = requestAnimationFrame(this.loop);
