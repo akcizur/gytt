@@ -14,7 +14,8 @@ app.innerHTML=`
   <div class="mission"><small>FREE ROAM</small><strong id="mission">Loading district…</strong></div>
 </div>
 <div id="touch">
-  <div class="pad"><button data-k="w">▲</button><div><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div></div>
+  <div id="joy-left" class="joy-zone" aria-label="Movement joystick"></div>
+  <div id="joy-right" class="joy-zone" aria-label="Camera joystick"></div>
   <div class="actions"><button data-k="shift">RUN</button><button data-k="space">JUMP</button><button data-k="e">E</button><button data-k="r">RESET</button></div>
 </div>
 <div id="help">WASD move • E enter/exit • SHIFT sprint • SPACE jump • R reset</div>
