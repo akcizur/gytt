@@ -1,5 +1,7 @@
 import * as T from "three";
+import { AnimationGraph, type PlayerAnimationState } from "../animation/AnimationGraph";
 import { InputSystem } from "../input/InputSystem";
+import type { CharacterAsset } from "../assets/AssetManager";
 
 export class Player {
   readonly object = new T.Group();
@@ -7,22 +9,25 @@ export class Player {
   position = new T.Vector3(0, 0, 8);
   yaw = 0;
   grounded = false;
-  state = "idle";
+  state: PlayerAnimationState = "idle";
 
   private body: any;
   private collider: any;
   private controller: any;
-  private visual: T.Mesh;
+  private fallback: T.Mesh | null = null;
+  private character: T.Group | null = null;
+  private animation: AnimationGraph | null = null;
 
   constructor(private R: any, private world: any, private input: InputSystem) {
     this.object.userData.noCameraCollision = true;
-    this.visual = new T.Mesh(
+
+    this.fallback = new T.Mesh(
       new T.CapsuleGeometry(0.38, 0.95, 6, 12),
       new T.MeshStandardMaterial({ color: 0x3d73b8, roughness: 0.8 }),
     );
-    this.visual.position.y = 1;
-    this.visual.castShadow = true;
-    this.object.add(this.visual);
+    this.fallback.position.y = 1;
+    this.fallback.castShadow = true;
+    this.object.add(this.fallback);
 
     this.body = world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0.75, 8),
@@ -33,11 +38,54 @@ export class Player {
     this.controller.enableSnapToGround(0.25);
   }
 
+  attachCharacter(asset: CharacterAsset) {
+    this.animation?.dispose();
+
+    if (this.character) {
+      this.object.remove(this.character);
+      this.disposeVisual(this.character);
+    }
+
+    if (this.fallback) {
+      this.object.remove(this.fallback);
+      this.fallback.geometry.dispose();
+      (this.fallback.material as T.Material).dispose();
+      this.fallback = null;
+    }
+
+    this.character = asset.scene;
+    this.character.rotation.y = Math.PI;
+
+    // Normalize arbitrary GLB scale/origin so the physics capsule stays authoritative.
+    const bounds = new T.Box3().setFromObject(this.character);
+    const size = bounds.getSize(new T.Vector3());
+    if (size.y > 0.001) this.character.scale.multiplyScalar(1.85 / size.y);
+
+    const normalizedBounds = new T.Box3().setFromObject(this.character);
+    this.character.position.y -= normalizedBounds.min.y;
+    this.character.traverse((object) => {
+      const mesh = object as T.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    });
+
+    this.object.add(this.character);
+    this.animation = new AnimationGraph(this.character);
+    this.animation.attach(asset.animations, {
+      idle: ["idle", "idle_loop"],
+      walk: ["walk", "walking"],
+      jog: ["jog", "walking"],
+      run: ["run", "running"],
+      crouch: ["crouch", "crouching"],
+      jump: ["jump", "jump start", "jumping"],
+      fall: ["fall", "falling"],
+    });
+  }
+
   update(dt: number, cameraYaw: number) {
     const a = this.input.sample();
 
-    // Three.js camera convention: forward is local -Z.
-    // cameraYaw=0 therefore means "north" / world -Z.
     const forward = new T.Vector3(-Math.sin(cameraYaw), 0, -Math.cos(cameraYaw));
     const right = new T.Vector3(Math.cos(cameraYaw), 0, -Math.sin(cameraYaw));
 
@@ -46,9 +94,6 @@ export class Player {
       .addScaledVector(right, a.moveX)
       .addScaledVector(forward, a.moveY);
 
-    // Standard third-person/mobile locomotion:
-    // deadzone -> walk -> jog -> full-speed run. Sprint is an explicit
-    // modifier, while the stick itself always controls the movement amount.
     const stickPower = inputLength > 0.10
       ? Math.min(1, (inputLength - 0.10) / 0.90)
       : 0;
@@ -61,14 +106,8 @@ export class Player {
     const target = dir.multiplyScalar(speed);
     const accel = a.crouch ? 24 : a.sprint ? 22 : 18;
 
-    this.velocity.x += Math.max(
-      -accel * dt,
-      Math.min(accel * dt, target.x - this.velocity.x),
-    );
-    this.velocity.z += Math.max(
-      -accel * dt,
-      Math.min(accel * dt, target.z - this.velocity.z),
-    );
+    this.velocity.x += Math.max(-accel * dt, Math.min(accel * dt, target.x - this.velocity.x));
+    this.velocity.z += Math.max(-accel * dt, Math.min(accel * dt, target.z - this.velocity.z));
 
     if (inputLength < 0.08) {
       const damping = Math.pow(0.001, dt);
@@ -76,9 +115,7 @@ export class Player {
       this.velocity.z *= damping;
     }
 
-    if (a.jump && this.grounded && !a.crouch) {
-      this.velocity.y = 7.2;
-    }
+    if (a.jump && this.grounded && !a.crouch) this.velocity.y = 7.2;
 
     this.velocity.y -= 18 * dt;
 
@@ -106,10 +143,8 @@ export class Player {
 
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     if (horizontalSpeed > 0.15) {
-      // The player model faces local -Z, matching the camera-relative input.
       const desiredYaw = Math.atan2(this.velocity.x, -this.velocity.z);
-      let delta = desiredYaw - this.yaw;
-      delta = Math.atan2(Math.sin(delta), Math.cos(delta));
+      let delta = Math.atan2(Math.sin(desiredYaw - this.yaw), Math.cos(desiredYaw - this.yaw));
       this.yaw += delta * (1 - Math.exp(-14 * dt));
     }
 
@@ -127,13 +162,29 @@ export class Player {
               ? "jog"
               : "run";
 
-    this.visual.scale.y = 1 + (this.state === "run" ? 0.05 : 0);
+    this.animation?.setState(this.state);
+    this.animation?.update(dt);
   }
 
   dispose() {
+    this.animation?.dispose();
+    if (this.character) this.disposeVisual(this.character);
+    if (this.fallback) {
+      this.fallback.geometry.dispose();
+      (this.fallback.material as T.Material).dispose();
+    }
     this.world.removeCollider(this.collider, true);
     this.world.removeRigidBody(this.body);
-    this.visual.geometry.dispose();
-    (this.visual.material as T.Material).dispose();
+  }
+
+  private disposeVisual(root: T.Object3D) {
+    root.traverse((object) => {
+      const mesh = object as T.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.dispose();
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const material of materials) material.dispose();
+    });
+    root.parent?.remove(root);
   }
 }
