@@ -1,8 +1,48 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 import { ASSETS,CITY_BUILDINGS } from "./AssetRegistry.js";
-import { Streaming } from "./Streaming.js";
-import { LODSystem } from "./LOD.js";
+
+class LODSystem{
+  constructor(game){this.game=game;this.entries=new Map();this.timer=0}
+  register(object,{near=180,far=360,hide=520}={}){
+    const entry={object,near,far,hide};this.entries.set(object,entry);return entry;
+  }
+  remove(object){this.entries.delete(object)}
+  update(dt=.016){
+    this.timer+=dt;if(this.timer<.12)return;this.timer=0;
+    const player=this.game?.player?.pos;if(!player)return;
+    for(const entry of this.entries.values()){
+      const object=entry.object;if(!object?.parent)continue;
+      const d=object.position.distanceTo(player);object.visible=d<=entry.hide;
+      if(!object.visible)continue;
+      const detail=1-Math.min(1,Math.max(0,(d-entry.near)/Math.max(.001,entry.far-entry.near)));
+      object.traverse(child=>{if(child.isMesh){child.castShadow=detail>.35;child.receiveShadow=detail>.2}});
+    }
+  }
+}
+
+class Streaming{
+  constructor(world,{chunkSize=120,activeRadius=1,unloadRadius=2}={}){
+    this.world=world;this.chunkSize=chunkSize;this.activeRadius=activeRadius;this.unloadRadius=unloadRadius;
+    this.loaded=new Map();this.loading=new Map();
+  }
+  key(x,z){return x+":"+z}
+  coords(position){return{x:Math.floor(position.x/this.chunkSize),z:Math.floor(position.z/this.chunkSize)}}
+  async update(position,{force=false}={}){
+    const center=this.coords(position);
+    for(let z=-this.activeRadius;z<=this.activeRadius;z++)for(let x=-this.activeRadius;x<=this.activeRadius;x++){
+      const cx=center.x+x,cz=center.z+z,key=this.key(cx,cz);
+      if(this.loaded.has(key)||this.loading.has(key))continue;
+      const promise=this.world.createChunk(cx,cz).then(chunk=>{this.loaded.set(key,chunk);this.loading.delete(key)}).catch(error=>{this.loading.delete(key);console.warn("Chunk streaming failed",key,error)});
+      this.loading.set(key,promise);
+    }
+    if(force)await Promise.all([...this.loading.values()]);
+    for(const [key,chunk] of this.loaded){
+      const distance=Math.max(Math.abs(chunk.x-center.x),Math.abs(chunk.z-center.z));
+      if(distance>this.unloadRadius){this.world.disposeChunk(chunk);this.loaded.delete(key)}
+    }
+  }
+}
 
 export class World{
   constructor(T,R){
@@ -27,7 +67,11 @@ export class World{
     });
     this.cache.set(url,p);return p;
   }
-  async clone(url){const base=await this.asset(url),m=base.clone(true);m.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});return m}
+  async clone(url){
+    const base=await this.asset(url),m=base.clone(true);
+    m.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+    return m;
+  }
   addBoxCollider(mesh,chunk){
     const box=new this.T.Box3().setFromObject(mesh);if(!isFinite(box.min.x))return;
     const size=box.getSize(new this.T.Vector3()),center=box.getCenter(new this.T.Vector3());
@@ -51,8 +95,7 @@ export class World{
   async createChunk(cx,cz){
     const T=this.T,group=new T.Group();group.name="chunk:"+cx+":"+cz;group.userData.chunk={x:cx,z:cz};
     this.scene.add(group);const chunk={x:cx,z:cz,group,colliders:[],objects:[]};
-    const tile=24,baseX=cx*5,baseZ=cz*5;
-    const add=object=>{group.add(object);chunk.objects.push(object);return object};
+    const tile=24,baseX=cx*5,baseZ=cz*5,add=object=>{group.add(object);chunk.objects.push(object);return object};
     const jobs=[];
     for(let tz=0;tz<5;tz++)for(let tx=0;tx<5;tx++){
       const gx=baseX+tx,gz=baseZ+tz,roadX=gx%5===0,roadZ=gz%5===0;
@@ -74,10 +117,12 @@ export class World{
   disposeChunk(chunk){
     for(const rb of chunk.colliders){try{this.world.removeRigidBody(rb)}catch{}}
     for(const object of chunk.objects)this.lod?.remove(object);
-    chunk.group.traverse(o=>{if(o.isMesh)o.visible=false});
     this.scene.remove(chunk.group);
   }
-  raycastFirst(origin,direction,far=500){this.raycaster.set(origin,direction);this.raycaster.far=far;return this.raycaster.intersectObjects(this.scene.children,true)[0]||null}
+  raycastFirst(origin,direction,far=500){
+    this.raycaster.set(origin,direction);this.raycaster.far=far;
+    return this.raycaster.intersectObjects(this.scene.children,true)[0]||null;
+  }
   update(dt=.016){
     this.world.timestep=Math.min(.033,Math.max(.001,dt));this.world.step();
     if(this.player)this.streaming.update(this.player.pos);
