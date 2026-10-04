@@ -72,7 +72,7 @@ export class World {
     this.addObject(road);
 
     const cross = road.clone();
-    cross.material = (road.material as T.Material).clone();
+    cross.material = new T.MeshStandardMaterial({ color: 0x25292d, roughness: 1 });
     cross.rotation.y = Math.PI / 2;
     this.addObject(cross);
   }
