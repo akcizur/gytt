@@ -1,194 +1,127 @@
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { ASSETS } from "./AssetRegistry.js";
-import { CharacterController } from "./CharacterController.js";
 
-const MOVE_DEAD_ZONE=.08;
-const CAMERA_SENSITIVITY=4.2;
+const MOVE_DEAD=.08;
+const LOOK_SPEED=3.6;
 
 export class Player{
   constructor(g){
-    this.g=g;
-    this.T=g.THREE;
-    this.R=g.RAPIER;
+    this.g=g; this.T=g.THREE; this.R=g.RAPIER;
     this.pos=new this.T.Vector3(0,0,10);
-    this.spawn=new this.T.Vector3(0,0,10);
     this.vel=new this.T.Vector3();
-    this.grounded=false;
-    this.jumpSpeed=6.5;
-    this.moveBlend=0;
+    this.spawn=this.pos.clone();
+    this.yaw=0; this.pitch=.22;
+    this.grounded=true;
+    this.driver=false;
+    this.model=null;
     this.mixer=null;
-    this.animations={};
-    this.state="";
-    this.animationPromise=null;
-    this.extendedAnimationPromise=null;
-    this.extendedAnimationsRequested=false;
-    this.cameraYaw=0;
-    this.cameraPitch=.28;
-    this.cameraReady=false;
-    this.controller=new CharacterController(g,{x:0,y:0,z:10});
+    this.actions={};
+    this.current="";
+    this.ready=false;
+    this.radius=.42;
+    this.height=1.8;
+    this.body=null;
+    this.collider=null;
+    this.controller=null;
   }
 
   build(){
-    const T=this.T;
-    this.mesh=new T.Group();
+    this.mesh=new this.T.Group();
     this.g.world.scene.add(this.mesh);
-
-    const body=new T.Mesh(
-      new T.CapsuleGeometry(.42,.9,6,10),
-      new T.MeshStandardMaterial({color:0xdddddd})
+    const capsule=new this.T.Mesh(
+      new this.T.CapsuleGeometry(.36,.95,6,10),
+      new this.T.MeshStandardMaterial({color:0x7aa18f,roughness:.8})
     );
-    body.position.y=1.05;
-    body.castShadow=true;
-    this.mesh.add(body);
+    capsule.position.y=.95; capsule.visible=false;
+    this.mesh.add(capsule);
 
-    const head=new T.Mesh(
-      new T.SphereGeometry(.28,12,8),
-      new T.MeshStandardMaterial({color:0xb87955})
-    );
-    head.position.y=1.8;
-    head.castShadow=true;
-    this.mesh.add(head);
-
-    this.controller.build();
-    this.body=this.controller.body;
-    this.collider=this.controller.collider;
-    this.syncMesh();
+    const R=this.R, w=this.g.world.world;
+    this.body=w.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,1,10));
+    this.collider=w.createCollider(R.ColliderDesc.capsule(.55,.42),this.body);
+    this.controller=w.createCharacterController(.02);
+    this.controller.enableAutostep(.45,.3,true);
+    this.controller.enableSnapToGround(.2);
+    this.controller.setMaxSlopeClimbAngle(Math.PI*.72);
+    this.sync();
     this.loadModel();
   }
 
   async loadModel(){
     try{
+      // Use the Universal Animation Library character itself as the player.
+      // Its mesh, skeleton and locomotion clips are from the same GLB, so
+      // there is no runtime retargeting or skeleton mismatch.
       const gltf=await new GLTFLoader().loadAsync(ASSETS.hero);
-      const model=gltf.scene;
-      model.traverse(o=>{
+      this.model=gltf.scene;
+      this.model.traverse(o=>{
         if(o.isMesh){o.castShadow=true;o.receiveShadow=true}
       });
 
-      const box=new this.T.Box3().setFromObject(model);
+      const box=new this.T.Box3().setFromObject(this.model);
       const size=box.getSize(new this.T.Vector3());
-      if(size.y>0)model.scale.setScalar(1.8/size.y);
-
-      const scaled=new this.T.Box3().setFromObject(model);
-      model.position.y=-scaled.min.y;
-
+      if(size.y>0)this.model.scale.setScalar(1.8/size.y);
+      const scaled=new this.T.Box3().setFromObject(this.model);
+      this.model.position.y=-scaled.min.y;
       this.mesh.clear();
-      this.mesh.add(model);
-      this.mesh.userData.model=model;
-      model.userData.baseY=model.position.y;
+      this.mesh.add(this.model);
 
-      this.mixer=new this.T.AnimationMixer(model);
+      this.mixer=new this.T.AnimationMixer(this.model);
       for(const clip of gltf.animations){
-        const key=this.normalizeAnimationName(clip.name);
-        this.animations[key]=this.mixer.clipAction(clip);
+        const key=this.key(clip.name);
+        if(!this.actions[key])this.actions[key]=this.mixer.clipAction(clip);
       }
-
-      this.cameraYaw=this.mesh.rotation.y;
-      this.cameraReady=true;
-      this.play("idle");
-      void this.loadAnimationLibrary();
+      this.ready=true;
+      this.play("idle",true);
     }catch(error){
-      console.warn("CC0 hero unavailable; procedural fallback active",error);
+      console.warn("Player GLB unavailable",error);
     }
   }
 
-  normalizeAnimationName(name){
-    return String(name||"animation")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g,"_")
-      .replace(/^_|_$/g,"");
+  key(name){
+    return String(name||"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
   }
 
-  async loadAnimationLibrary(){
-    if(this.animationPromise)return this.animationPromise;
-    this.animationPromise=this.loadAnimationPack(ASSETS.animationPacks?.locomotion);
-    return this.animationPromise;
-  }
-
-  async loadExtendedAnimations(){
-    if(this.extendedAnimationPromise)return this.extendedAnimationPromise;
-    this.extendedAnimationPromise=this.loadAnimationPack(ASSETS.animationPacks?.extended);
-    return this.extendedAnimationPromise;
-  }
-
-  async loadAnimationPack(url){
-    if(!url)return;
-    try{
-      const gltf=await new GLTFLoader().loadAsync(url);
-      if(!this.mixer)return;
-
-      // The player mesh and Quaternius UAL use the same 65-bone humanoid rig.
-      // Play the library clips directly instead of retargeting them at runtime.
-      // This avoids the classic T-pose failure caused by mismatched bone maps.
-      for(const clip of gltf.animations){
-        try{
-          const key=this.normalizeAnimationName(clip.name);
-          if(this.animations[key])continue;
-          this.animations[key]=this.mixer.clipAction(clip);
-        }catch(error){
-          console.warn("Animation skipped",clip.name,error);
-        }
-      }
-      this.play(this.state||"idle",true);
-    }catch(error){
-      console.warn("Open animation pack unavailable",url,error);
+  find(names){
+    const keys=Object.keys(this.actions);
+    for(const wanted of names){
+      const exact=this.key(wanted);
+      if(this.actions[exact])return this.actions[exact];
+      const found=keys.find(k=>k.includes(exact));
+      if(found)return this.actions[found];
     }
+    return null;
   }
 
-  play(wanted,force=false){
+  play(state,force=false){
     if(!this.mixer)return;
-    const keys=Object.keys(this.animations);
-    if((wanted==="jump"||wanted==="fall")&&!this.extendedAnimationsRequested){
-      this.extendedAnimationsRequested=true;
-      void this.loadExtendedAnimations();
-    }
-    if(!keys.length)return;
-
-    const aliases={
-      idle:["idle","stand","breathing","relaxed"],
-      walk:["walk","locomotion","jog_fwd","jog"],
-      run:["run","sprint","jog","fast","jog_fwd"],
-      jump:["jump","jump_up","takeoff"],
-      fall:["fall","air","falling","jump"],
-      land:["land","landing","idle"]
-    };
-
-    const preferred={
-      idle:["idle_loop","idle"],
+    const map={
+      idle:["idle_loop","idle","breathing"],
       walk:["walk_loop","walk"],
-      run:["sprint_loop","jog_fwd_loop","run"],
-      jump:["jump_start","jump_loop","jump"],
+      run:["sprint_loop","jog_fwd_loop","run_loop","run"],
+      jump:["jump_start","jump"],
       fall:["jump_loop","fall"],
       land:["jump_land","land"]
-    }[wanted]||[wanted];
-    const key=keys.find(name=>preferred.some(alias=>name===alias||name.includes(alias)))
-      ||keys.find(name=>(aliases[wanted]||[wanted]).some(alias=>name.includes(alias)))
-      ||keys[0];
-    if(!force&&this.state===wanted&&this.activeAnimationKey===key)return;
-
-    Object.entries(this.animations).forEach(([name,action])=>{
-      if(name!==key)action.fadeOut(.14);
+    };
+    const action=this.find(map[state]||[state]);
+    if(!action)return;
+    if(!force&&this.current===state)return;
+    Object.values(this.actions).forEach(a=>{
+      if(a!==action)a.fadeOut(.1);
     });
-
-    this.animations[key].reset().fadeIn(.14).play();
-    this.activeAnimationKey=key;
-    this.state=wanted;
+    action.reset().setEffectiveTimeScale(state==="run"?1.05:1).setEffectiveWeight(1).fadeIn(.1).play();
+    this.current=state;
   }
 
-  getMoveAxes(){
+  axes(){
     const i=this.g.input;
-    let x=i.axisX();
-    let y=i.axisY();
-
-    if(Math.hypot(x,y)<MOVE_DEAD_ZONE){
+    let x=i.axisX(), y=i.axisY();
+    if(Math.hypot(x,y)<MOVE_DEAD){
       x=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0);
       y=(i.down("KeyW")?1:0)-(i.down("KeyS")?1:0);
     }
-
-    return {
-      x,
-      y,
-      magnitude:Math.min(1,Math.hypot(x,y))
-    };
+    const len=Math.hypot(x,y);
+    if(len>1){x/=len;y/=len}
+    return {x,y,magnitude:Math.min(1,len)};
   }
 
   update(dt){
@@ -199,131 +132,116 @@ export class Player{
     }
 
     const i=this.g.input;
-    const result=this.controller.update(i,this.cameraYaw,dt);
-    this.pos.copy(this.controller.position);
-    this.mesh.position.copy(this.pos);
-    this.grounded=this.controller.grounded;
-    this.vel.copy(this.controller.velocity);
+    const a=this.axes();
+    const moving=a.magnitude>MOVE_DEAD;
+    const sprint=i.down("ShiftLeft")||i.down("ShiftRight");
+    const maxSpeed=sprint?8.5:4.8;
+    const amount=moving?Math.min(1,(a.magnitude-MOVE_DEAD)/(1-MOVE_DEAD)):0;
 
-    const state=!this.grounded
-      ?(this.vel.y>0?"jump":"fall")
-      :(result.moving?(result.sprint?"run":"walk"):"idle");
-    this.play(state);
+    const lx=a.x, lz=-a.y;
+    const wx=lx*Math.cos(this.yaw)+lz*Math.sin(this.yaw);
+    const wz=-lx*Math.sin(this.yaw)+lz*Math.cos(this.yaw);
+    const targetX=wx*maxSpeed*amount;
+    const targetZ=wz*maxSpeed*amount;
+    const blend=Math.min(1,(moving?18:24)*dt);
+    this.vel.x+=(targetX-this.vel.x)*blend;
+    this.vel.z+=(targetZ-this.vel.z)*blend;
+
+    if(!moving){this.vel.x*=Math.exp(-18*dt);this.vel.z*=Math.exp(-18*dt)}
+    this.vel.y+=-18*dt;
+    if(i.pressed("Space")&&this.grounded)this.vel.y=6.2;
+
+    const desired={x:this.vel.x*dt,y:this.vel.y*dt,z:this.vel.z*dt};
+    this.controller.computeColliderMovement(this.collider,desired);
+    const corrected=this.controller.computedMovement();
+    const current=this.body.translation();
+    const next={
+      x:current.x+corrected.x,
+      y:Math.max(1,current.y+corrected.y),
+      z:current.z+corrected.z
+    };
+
+    // Apply immediately; the render transform never waits for the physics step.
+    this.body.setTranslation(next,true);
+    this.pos.set(next.x,next.y-1,next.z);
+    this.grounded=this.controller.computedGrounded()||next.y<=1.02;
+    if(this.grounded&&this.vel.y<0)this.vel.y=0;
+
+    this.mesh.position.copy(this.pos);
+
+    if(moving){
+      const targetYaw=Math.atan2(this.vel.x,this.vel.z);
+      let d=targetYaw-this.mesh.rotation.y;
+      while(d>Math.PI)d-=Math.PI*2;
+      while(d<-Math.PI)d+=Math.PI*2;
+      this.mesh.rotation.y+=d*Math.min(1,dt*14);
+      this.play(sprint?"run":"walk");
+    }else{
+      this.play("idle");
+    }
 
     if(this.mixer)this.mixer.update(dt);
-
-    if(result.moving){
-      const targetYaw=Math.atan2(this.vel.x,this.vel.z);
-      let delta=targetYaw-this.mesh.rotation.y;
-      while(delta>Math.PI)delta-=Math.PI*2;
-      while(delta<-Math.PI)delta+=Math.PI*2;
-      this.mesh.rotation.y+=delta*Math.min(1,dt*14);
-    }
-
-    if(this.mesh.userData.model&&!this.mixer){
-      const model=this.mesh.userData.model;
-      const phase=performance.now()*.012;
-      const bob=result.moving?Math.abs(Math.sin(phase*1.7))*.035:0;
-      model.position.y=model.userData.baseY+bob;
-      model.rotation.x=(result.moving?.025:0);
-    }
-
     this.updateCamera(dt);
   }
 
   updateCamera(dt){
-    const T=this.T;
-    const c=this.g.world.camera;
-    const target=this.pos.clone().add(new T.Vector3(0,1.2,0));
-    const input=this.g.input;
+    const T=this.T,c=this.g.world.camera,i=this.g.input;
+    const target=this.pos.clone().add(new T.Vector3(0,1.05,0));
+    const mouse=i.consumeMouseLook();
 
-    if(!this.cameraReady){
-      this.cameraYaw=this.mesh.rotation.y;
-      this.cameraReady=true;
+    if(i.look.strength>.02){
+      this.yaw-=i.lookX()*LOOK_SPEED*dt;
+      this.pitch-=i.lookY()*LOOK_SPEED*dt;
+    }else if(Math.abs(mouse.x)+Math.abs(mouse.y)>0){
+      this.yaw-=mouse.x*.003;
+      this.pitch-=mouse.y*.0025;
     }
+    this.pitch=Math.max(-.35,Math.min(.75,this.pitch));
 
-    const mouse=input.consumeMouseLook();
-    const hasMouseLook=Math.abs(mouse.x)+Math.abs(mouse.y)>0;
-    const hasTouchLook=input.look.strength>0;
-    if(hasTouchLook){
-      this.cameraYaw-=input.lookX()*CAMERA_SENSITIVITY*dt;
-      this.cameraPitch-=input.lookY()*CAMERA_SENSITIVITY*dt;
-      this.cameraPitch=Math.max(-.22,Math.min(.82,this.cameraPitch));
-    }else if(hasMouseLook){
-      this.cameraYaw-=mouse.x*.0032;
-      this.cameraPitch-=mouse.y*.0026;
-      this.cameraPitch=Math.max(-.22,Math.min(.82,this.cameraPitch));
-    }else{
-      const targetYaw=this.mesh.rotation.y;
-      let delta=targetYaw-this.cameraYaw;
-      while(delta>Math.PI)delta-=Math.PI*2;
-      while(delta<-Math.PI)delta+=Math.PI*2;
-      this.cameraYaw+=delta*Math.min(1,dt*1.5);
-    }
-
-    const horizontal=7;
-    const offset=new T.Vector3(
-      Math.sin(this.cameraYaw)*horizontal,
-      2.4+this.cameraPitch*3.0,
-      Math.cos(this.cameraYaw)*horizontal
-    );
-    const desired=target.clone().add(offset);
-    const safe=this.g.world.cameraPosition(target,desired,this.mesh,1.05);
-    c.position.lerp(safe,.2);
+    const desired=target.clone().add(new T.Vector3(
+      Math.sin(this.yaw)*6.5,
+      2.1+this.pitch*2.4,
+      Math.cos(this.yaw)*6.5
+    ));
+    const safe=this.g.world.cameraPosition(target,desired,this.mesh,1);
+    c.position.lerp(safe,.28);
     c.lookAt(target);
   }
 
   followVehicle(dt){
-    const T=this.T;
-    const v=this.g.vehicle;
-    const c=this.g.world.camera;
-    const input=this.g.input;
-    const mouse=input.consumeMouseLook();
-    const target=v.pos.clone().add(new T.Vector3(0,1.4,0));
-
-    if(input.look.strength>0){
-      this.cameraYaw-=input.lookX()*CAMERA_SENSITIVITY*dt;
-      this.cameraPitch-=input.lookY()*CAMERA_SENSITIVITY*dt;
-      this.cameraPitch=Math.max(-.18,Math.min(.7,this.cameraPitch));
+    const T=this.T,c=this.g.world.camera,i=this.g.input;
+    const target=this.g.vehicle.pos.clone().add(new T.Vector3(0,1.35,0));
+    const mouse=i.consumeMouseLook();
+    if(i.look.strength>.02){
+      this.yaw-=i.lookX()*LOOK_SPEED*dt;
+      this.pitch-=i.lookY()*LOOK_SPEED*dt;
     }else if(Math.abs(mouse.x)+Math.abs(mouse.y)>0){
-      this.cameraYaw-=mouse.x*.0032;
-      this.cameraPitch-=mouse.y*.0026;
-      this.cameraPitch=Math.max(-.18,Math.min(.7,this.cameraPitch));
-    }else{
-      let delta=v.heading-this.cameraYaw;
-      while(delta>Math.PI)delta-=Math.PI*2;
-      while(delta<-Math.PI)delta+=Math.PI*2;
-      this.cameraYaw+=delta*Math.min(1,dt*2.2);
+      this.yaw-=mouse.x*.003;
+      this.pitch-=mouse.y*.0025;
     }
-
-    const back=new T.Vector3(
-      Math.sin(this.cameraYaw)*8,
-      3.1+Math.sin(this.cameraPitch)*2,
-      Math.cos(this.cameraYaw)*8
-    );
-    const desired=target.clone().add(back);
-    const safe=this.g.world.cameraPosition(target,desired,this.mesh,1.15);
-    c.position.lerp(safe,.2);
-    c.lookAt(target);
+    this.pitch=Math.max(-.2,Math.min(.7,this.pitch));
+    const desired=target.clone().add(new T.Vector3(
+      Math.sin(this.yaw)*8,3+this.pitch*2,Math.cos(this.yaw)*8
+    ));
+    const safe=this.g.world.cameraPosition(target,desired,this.mesh,1.1);
+    c.position.lerp(safe,.25); c.lookAt(target);
   }
 
-  syncMesh(){
+  sync(){
     const t=this.body.translation();
     this.pos.set(t.x,t.y-1,t.z);
     this.mesh.position.copy(this.pos);
   }
 
+  teleport(x,y,z){
+    this.body.setTranslation({x,y:y+1,z},true);
+    this.pos.set(x,y,z);
+    this.mesh.position.copy(this.pos);
+  }
+
   reset(){
-    this.mesh.rotation.y=0;
-    this.controller.reset();
-    this.body=this.controller.body;
-    this.collider=this.controller.collider;
-    this.pos.copy(this.controller.position);
-    this.vel.copy(this.controller.velocity);
-    this.grounded=this.controller.grounded;
-    this.cameraPitch=.28;
-    this.cameraYaw=0;
-    this.syncMesh();
+    this.vel.set(0,0,0); this.yaw=0; this.pitch=.22;
+    this.teleport(this.spawn.x,this.spawn.y,this.spawn.z);
     this.mesh.visible=true;
   }
 }
