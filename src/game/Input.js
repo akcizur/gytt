@@ -60,7 +60,7 @@ export class Input{
       restJoystick:true,
       restOpacity:.34,
       shape:"circle",
-      dynamicPage:true,
+      dynamicPage:false,
       position:{left:"50%",top:"50%"},
       color:{
         front:"rgba(255,255,255,.86)",
