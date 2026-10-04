@@ -46,17 +46,20 @@ export class Player {
       .addScaledVector(right, a.moveX)
       .addScaledVector(forward, a.moveY);
 
-    // Analog locomotion curve:
-    // light stick = slow walk, middle = jog, full stick = run/sprint.
-    // The curve removes the "all-or-nothing" feeling of a digital stick.
-    const stickPower = inputLength > 0 ? Math.pow(inputLength, 1.65) : 0;
-    const maxSpeed = a.crouch ? 2.8 : a.sprint ? 9.2 : 7.0;
-    const speed = maxSpeed * stickPower;
+    // Standard third-person/mobile locomotion:
+    // deadzone -> walk -> jog -> full-speed run. Sprint is an explicit
+    // modifier, while the stick itself always controls the movement amount.
+    const stickPower = inputLength > 0.10
+      ? Math.min(1, (inputLength - 0.10) / 0.90)
+      : 0;
+    const curvedInput = stickPower * stickPower * (3 - 2 * stickPower);
+    const maxSpeed = a.crouch ? 2.4 : a.sprint ? 8.6 : 6.2;
+    const speed = maxSpeed * curvedInput;
 
     if (dir.lengthSq() > 1) dir.normalize();
 
     const target = dir.multiplyScalar(speed);
-    const accel = 20;
+    const accel = a.crouch ? 24 : a.sprint ? 22 : 18;
 
     this.velocity.x += Math.max(
       -accel * dt,
@@ -116,11 +119,11 @@ export class Player {
       ? this.velocity.y > 0 ? "jump" : "fall"
       : a.crouch
         ? "crouch"
-        : inputLength < 0.12
+        : inputLength < 0.10
           ? "idle"
-          : inputLength < 0.48
+          : inputLength < 0.42
             ? "walk"
-            : inputLength < 0.82
+            : inputLength < 0.78
               ? "jog"
               : "run";
 
