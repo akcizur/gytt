@@ -21,6 +21,8 @@ export class Game {
   private accumulator = 0;
   private raf = 0;
   private running = false;
+  private disposed = false;
+  private lastRenderedPlayer = new T.Vector3();
   private yaw = 0;
   private pitch = -0.2;
   private frames = 0;
@@ -47,6 +49,7 @@ export class Game {
   }
 
   async start() {
+    if (this.disposed || this.running) return;
     try {
       const url = new URL("assets/characters/RobotExpressive.glb", import.meta.env.BASE_URL).href;
       const character = await this.assets.loadCharacter(url);
@@ -57,6 +60,9 @@ export class Game {
 
     this.running = true;
     this.last = performance.now();
+    this.fpsTime = this.last;
+    this.frames = 0;
+    this.lastRenderedPlayer.copy(this.player.position);
     this.accumulator = 0;
     document.querySelector("#boot")?.remove();
     this.raf = requestAnimationFrame(this.loop);
@@ -82,6 +88,7 @@ export class Game {
       this.accumulator = 0;
     }
 
+    // Camera/render stay on the display clock; simulation stays fixed-step.
     this.cameraUpdate(frameDt);
     this.render.render(this.scene);
     this.hud();
@@ -127,6 +134,8 @@ export class Game {
   }
 
   dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
     this.running = false;
     cancelAnimationFrame(this.raf);
     this.player.dispose();
