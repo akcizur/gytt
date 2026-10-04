@@ -78,16 +78,13 @@ export class Vehicle{
       return;
     }
 
-    if(!this.groundedTest()&&p.pos.distanceTo(this.pos)<4){
+    if(p.pos.distanceTo(this.pos)<4){
       this.driver=true;
       p.mesh.visible=false;
       p.vel.set(0,0,0);
     }
   }
 
-  groundedTest(){
-    return true;
-  }
 
   update(dt){
     const i=this.g.input;
