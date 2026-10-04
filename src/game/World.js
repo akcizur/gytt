@@ -79,7 +79,6 @@ export class World{
     const rb=this.world.createRigidBody(
       this.R.RigidBodyDesc.fixed()
         .setTranslation(center.x,center.y,center.z)
-        .setRotation({x:0,y:Math.sin(mesh.rotation.y/2),z:0,w:Math.cos(mesh.rotation.y/2)})
     );
     this.world.createCollider(this.R.ColliderDesc.cuboid(size.x/2,size.y/2,size.z/2),rb);
     chunk.colliders.push(rb);
