@@ -31,7 +31,7 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
   addBuilding(x,z){const w=18+(Math.abs(x*z)%8),d=18+(Math.abs(x+z)%8),h=8+(Math.abs(x*7+z*3)%32);const m=this.box(w,h,d,0x66727b);m.position.set(x,h/2,z);m.userData.proceduralBuilding=true;this.scene.add(m);this.colliderBox(x,h/2,z,w,h,d);if(h>22)for(let y=5;y<h-2;y+=5){const strip=this.box(w*.72,.35,.08,0x9eb5b8);strip.position.set(x,y,z-d/2-.05);strip.castShadow=false;this.scene.add(strip)}}
   addTree(x,z){const g=new this.T.Group(),trunk=this.box(1.2,4,1.2,0x5b4430),crown=new this.T.Mesh(new this.T.IcosahedronGeometry(3.5,1),this.mat(0x31583e));trunk.position.y=2;crown.position.y=5.5;crown.castShadow=true;g.add(trunk,crown);g.position.set(x,0,z);this.scene.add(g)}
   addLandmark(x,z){const p=this.box(16,1,16,0x6d747b);p.position.set(x,.5,z);this.scene.add(p);const ring=new this.T.Mesh(new this.T.TorusGeometry(6,.18,10,48),this.mat(0xd9b25d,.4,.5));ring.rotation.x=Math.PI/2;ring.position.set(x,1.1,z);this.scene.add(ring)}
-  buildPlayer(){this.player={pos:new this.T.Vector3(0,1,8),vel:new this.T.Vector3(),yaw:0,grounded:false,health:100,model:new this.T.Group(),action:"idle",mixer:null,clips:{},bones:{},animationLock:false,animationState:"idle"};const g=this.player.model;g.userData.noCameraCollision=true;const body=this.box(1,1.7,.55,0x3e6fb4),head=new this.T.Mesh(new this.T.SphereGeometry(.38,16,12),this.mat(0xc98d6b));body.position.y=1.25;head.position.y=2.3;g.add(body,head);g.position.copy(this.player.pos);this.scene.add(g);this.player.body=this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.player.pos.x,this.player.pos.y+.7,this.player.pos.z));this.player.collider=this.world.createCollider(this.R.ColliderDesc.capsule(.7,.38),this.player.body);this.player.controller=this.world.createCharacterController(.05);this.player.controller.enableAutostep(.6,.25,true);this.player.controller.enableSnapToGround(.3);this.player.controller.setApplyImpulsesToDynamicBodies?.(false);this.loadRiggedPlayer()}
+  buildPlayer(){this.player={pos:new this.T.Vector3(0,1,8),vel:new this.T.Vector3(),yaw:0,grounded:false,health:100,model:new this.T.Group(),action:"idle",mixer:null,clips:{},bones:{},animationLock:false,animationState:"idle",slideTimer:0,rollTimer:0,locomotionState:"idle"};const g=this.player.model;g.userData.noCameraCollision=true;const body=this.box(1,1.7,.55,0x3e6fb4),head=new this.T.Mesh(new this.T.SphereGeometry(.38,16,12),this.mat(0xc98d6b));body.position.y=1.25;head.position.y=2.3;g.add(body,head);g.position.copy(this.player.pos);this.scene.add(g);this.player.body=this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.player.pos.x,this.player.pos.y+.7,this.player.pos.z));this.player.collider=this.world.createCollider(this.R.ColliderDesc.capsule(.7,.38),this.player.body);this.player.controller=this.world.createCharacterController(.05);this.player.controller.enableAutostep(.6,.25,true);this.player.controller.enableSnapToGround(.3);this.player.controller.setApplyImpulsesToDynamicBodies?.(false);this.loadRiggedPlayer()}
   async loadRiggedPlayer(){
     const url="https://raw.githubusercontent.com/programasweights/avatar/main/public/assets/character.glb";
     try{
@@ -128,10 +128,12 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
     if(state==="idle")return this.findAnimation("Idle_Loop","Idle","Breathing");
     if(state==="walk")return this.findAnimation("Walk_Loop","Walk_Forward","Walk","Jog_Fwd_Loop");
     if(state==="run")return this.findAnimation("Sprint_Loop","Sprint","Run_Loop","Run","Jog_Fwd_Loop");
+    if(state==="crouch")return this.findAnimation("Crouch_Idle_Loop","Crouch_Fwd_Loop","Crouch");
+    if(state==="slide")return this.findAnimation("Slide","Slide_Loop","PowerSlide");
+    if(state==="roll")return this.findAnimation("Roll","Roll_Forward","ForwardRoll","Dodge");
     if(state==="jump")return this.findAnimation("Jump_Start","NinjaJump_Start","Jump");
     if(state==="fall")return this.findAnimation("Jump_Loop","NinjaJump_Idle_Loop","Fall","Falling");
     if(state==="land")return this.findAnimation("Jump_Land","NinjaJump_Land","Land");
-    if(state==="crouch")return this.findAnimation("Crouch_Idle_Loop","Crouch_Fwd_Loop");
     return this.findAnimation("Idle_Loop","Idle")
   }
   setPlayerAnimation(state){
@@ -167,6 +169,8 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
   updatePlayer(dt){
     const p=this.player,i=this.input;
     if(this.vehicle.driver)return;
+    p.slideTimer=Math.max(0,p.slideTimer-dt);
+    p.rollTimer=Math.max(0,p.rollTimer-dt);
     let x=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0)+i.move.x;
     let z=(i.down("KeyS")?1:0)-(i.down("KeyW")?1:0)-i.move.y;
     const rawLen=Math.hypot(x,z);
@@ -177,14 +181,24 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
     const dir=new this.T.Vector3().addScaledVector(right,x).addScaledVector(forward,z);
     if(dir.lengthSq()>1e-5)dir.normalize();
     const sprint=i.down("ShiftLeft")||i.down("ShiftRight");
-    const target=inputLen>.08?(sprint?8.5:4.8):0;
-    const accel=target?20:28;
+    const crouch=i.down("ControlLeft")||i.down("ControlRight");
+    const speedNow=Math.hypot(p.vel.x,p.vel.z);
+    if(i.pressed("KeyQ")&&p.grounded&&speedNow>3&&p.rollTimer<=0&&!p.slideTimer)p.rollTimer=.65;
+    if(crouch&&sprint&&p.grounded&&speedNow>5&&p.slideTimer<=0&&p.rollTimer<=0)p.slideTimer=.7;
+    let target=0;
+    if(inputLen>.08){
+      if(p.rollTimer>0)target=7.2;
+      else if(p.slideTimer>0)target=9.5;
+      else if(crouch)target=2.7;
+      else target=sprint?8.5:4.8;
+    }
+    const accel=(p.slideTimer||p.rollTimer)?12:(target?20:28);
     const wanted=dir.multiplyScalar(target);
     p.vel.x+=clamp(wanted.x-p.vel.x,-accel*dt,accel*dt);
     p.vel.z+=clamp(wanted.z-p.vel.z,-accel*dt,accel*dt);
     if(!target){p.vel.x*=Math.pow(.001,dt);p.vel.z*=Math.pow(.001,dt)}
     const wasGrounded=p.grounded;
-    if(i.pressed("Space")&&p.grounded)p.vel.y=7.2;
+    if(i.pressed("Space")&&p.grounded&&!p.slideTimer&&!p.rollTimer)p.vel.y=7.2;
     p.vel.y-=18*dt;
     this.player.controller.computeColliderMovement(p.collider,{x:p.vel.x*dt,y:p.vel.y*dt,z:p.vel.z*dt});
     const c=this.player.controller.computedMovement();
@@ -198,13 +212,23 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
       const targetYaw=Math.atan2(p.vel.x,p.vel.z);
       let delta=targetYaw-p.yaw;
       delta=Math.atan2(Math.sin(delta),Math.cos(delta));
-      p.yaw+=delta*(1-Math.exp(-14*dt));
+      const turnRate=(p.slideTimer||p.rollTimer)?7:14;
+      p.yaw+=delta*(1-Math.exp(-turnRate*dt));
     }
     p.model.rotation.y=p.yaw;
     const justLanded=!wasGrounded&&p.grounded;
-    p.action=!p.grounded?(p.vel.y>0?"jump":"fall"):speed<.12?"idle":speed<6.2?"walk":"run";
+    let state;
+    if(!p.grounded)state=p.vel.y>0?"jump":"fall";
+    else if(p.rollTimer>0)state="roll";
+    else if(p.slideTimer>0)state="slide";
+    else if(crouch)state=speed>.15?"crouch":"crouch";
+    else if(speed<.12)state="idle";
+    else if(speed<6.2)state="walk";
+    else state="run";
+    p.action=state;
+    p.locomotionState=state;
     this.animatePlayer();
-    this.setPlayerAnimation(justLanded?"land":p.action)
+    this.setPlayerAnimation(justLanded?"land":state);
   }
   animatePlayer(){const p=this.player,t=performance.now()/1000,b=p.model.children[0];if(b&&!p.rig){b.scale.y=1+(p.action==="run"?.06:0)+(p.action==="jump"?.12:0);b.rotation.z=p.action==="run"?Math.sin(t*18)*.06:Math.sin(t*3)*.015}if(p.rig&&!p.mixer){const n=Math.hypot(p.vel.x,p.vel.z),phase=t*(p.action==="run"?12:7);const swing=Math.sin(phase)*Math.min(.65,n/8);const sway=Math.sin(phase+.8)*Math.min(.18,n/8);const q=p.bones;p.rig.rotation.y=0;if(q.lUpper)q.lUpper.rotation.x=swing;if(q.rUpper)q.rUpper.rotation.x=-swing;if(q.lLower)q.lLower.rotation.x=Math.max(0,-swing)*.55;if(q.rLower)q.rLower.rotation.x=Math.max(0,swing)*.55;if(q.lArm)q.lArm.rotation.x=-swing*.55;if(q.rArm)q.rArm.rotation.x=swing*.55;if(q.spine)q.spine.rotation.z=sway*.12;if(q.head)q.head.rotation.z=-sway*.2}}
   updateVehicle(dt){const v=this.vehicle,i=this.input;if(i.pressed("KeyE")){if(v.driver){v.driver=false;this.mode="foot";this.player.model.visible=true;const side=new this.T.Vector3(3,0,0).applyAxisAngle(new this.T.Vector3(0,1,0),v.heading);this.player.pos.set(v.pos.x+side.x,0,v.pos.z+side.z);this.player.body.setNextKinematicTranslation({x:this.player.pos.x,y:this.player.pos.y+.7,z:this.player.pos.z});v.speed*=.5;this.show("Exited vehicle")}else if(dist(this.player.pos,v.pos)<4){v.driver=true;this.mode="vehicle";this.player.model.visible=false;this.raiseWanted(.2);this.show("Vehicle acquired")}}if(!v.driver){v.speed*=Math.pow(.03,dt);return}const throttle=(i.down("KeyW")?1:0)-(i.down("KeyS")?1:0),steer=(i.down("KeyD")?1:0)-(i.down("KeyA")?1:0)+i.move.x*.8;v.speed=clamp(v.speed+throttle*18*dt,-9,28);v.speed*=Math.pow(.45,dt);v.heading+=steer*clamp(Math.abs(v.speed)/6,0,1)*1.65*dt;v.pos.x=clamp(v.pos.x+Math.sin(v.heading)*v.speed*dt,-248,248);v.pos.z=clamp(v.pos.z+Math.cos(v.heading)*v.speed*dt,-248,248);v.group.position.copy(v.pos);v.group.rotation.y=v.heading;v.body.setNextKinematicTranslation({x:v.pos.x,y:.45,z:v.pos.z})}
