@@ -14,17 +14,13 @@ export type GameEventMap = {
     status: "booting" | "running" | "paused" | "disposed";
   };
   "ui:command": {
-    command:
-      | "pause"
-      | "resume"
-      | "toggle-pause"
-      | "interact";
+    command: "pause" | "resume" | "toggle-pause" | "interact";
   };
 };
 
 type Listener<T> = (payload: T) => void;
 
-export class EventBus<Events extends Record<string, unknown>> {
+export class EventBus<Events extends object> {
   private readonly listeners = new Map<keyof Events, Set<Listener<any>>>();
 
   on<K extends keyof Events>(event: K, listener: Listener<Events[K]>): () => void {
@@ -33,7 +29,6 @@ export class EventBus<Events extends Record<string, unknown>> {
       set = new Set();
       this.listeners.set(event, set);
     }
-
     set.add(listener as Listener<any>);
     return () => this.off(event, listener);
   }
