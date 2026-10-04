@@ -53,6 +53,6 @@ export class World{
     const props=["traffic-light","light-square","electricity-pole"];
     await Promise.all(Array.from({length:24},(_,i)=>this.clone(ASSETS.road(props[i%props.length])).then(m=>{const a=i%4,p=96;const x=a<2?(i%6-3)*48:(a===2?p:-p),z=a<2?(a===0?p:-p):(i%6-3)*48;m.position.set(x,0,z);this.scene.add(m)}).catch(()=>{})));
   }
-  update(){this.world.step()}
+  update(){this.world.timestep=Math.min(.033,Math.max(.001,arguments[0]??.016));this.world.step()}
   render(){this.renderer.render(this.scene,this.camera)}
 }
