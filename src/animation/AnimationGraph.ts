@@ -1,7 +1,6 @@
 import * as T from "three";
 
 export type PlayerAnimationState = "idle" | "walk" | "jog" | "run" | "crouch" | "jump" | "fall";
-
 type ClipMap = Partial<Record<PlayerAnimationState, string[]>>;
 
 const DEFAULT_CLIPS: Record<PlayerAnimationState, string[]> = {
@@ -14,9 +13,7 @@ const DEFAULT_CLIPS: Record<PlayerAnimationState, string[]> = {
   fall: ["fall", "falling", "airborne"],
 };
 
-function normalize(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-}
+const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 export class AnimationGraph {
   private mixer: T.AnimationMixer | null = null;
@@ -31,36 +28,38 @@ export class AnimationGraph {
     this.clipMap = clipMap;
     this.mixer = new T.AnimationMixer(this.root);
 
-    const normalized = clips.map((clip) => ({ clip, name: normalize(clip.name) }));
+    const normalized = clips.map(clip => ({ clip, name: normalize(clip.name) }));
     for (const state of Object.keys(this.clipMap) as PlayerAnimationState[]) {
       const aliases = (this.clipMap[state] ?? []).map(normalize);
       const found = normalized.find(({ name }) =>
-        aliases.some((alias) => name === alias || name.includes(alias)),
+        aliases.some(alias => name === alias || name.includes(alias)),
       );
       if (found) this.actions.set(state, this.mixer.clipAction(found.clip));
+    }
+
+    // Always have a usable visual state when an asset has incomplete animation names.
+    if (!this.actions.has("idle") && clips[0]) {
+      this.actions.set("idle", this.mixer.clipAction(clips[0]));
     }
 
     this.setState(this.current, true);
   }
 
   setState(state: PlayerAnimationState, immediate = false) {
-    if (!this.mixer || this.current === state && !immediate) return;
-
     const next = this.actions.get(state);
+    if (!next || !this.mixer) return;
+    if (this.current === state && !immediate && next.isRunning()) return;
+
     const previous = this.actions.get(this.current);
     this.current = state;
 
-    if (!next) return;
-
     next.reset().setLoop(T.LoopRepeat, Infinity);
-    if (previous && previous !== next) {
-      previous.fadeOut(immediate ? 0 : 0.12);
-    }
+    if (previous && previous !== next) previous.fadeOut(immediate ? 0 : 0.12);
     next.fadeIn(immediate ? 0 : 0.12).play();
   }
 
   update(dt: number) {
-    this.mixer?.update(dt);
+    if (this.mixer && Number.isFinite(dt) && dt > 0) this.mixer.update(dt);
   }
 
   dispose() {
