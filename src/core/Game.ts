@@ -65,6 +65,8 @@ export class Game {
       console.warn("Character asset unavailable; procedural fallback remains active.", error);
     }
 
+    await this.loadShowcaseEnvironment();
+
     if (this.disposed) return;
 
     this.running = true;
@@ -75,6 +77,26 @@ export class Game {
     this.accumulator = 0;
     document.querySelector("#boot")?.remove();
     this.raf = requestAnimationFrame(this.loop);
+  }
+
+  private async loadShowcaseEnvironment() {
+    const base = import.meta.env.BASE_URL;
+    const houseUrl = new URL("assets/environment/house.glb", base).href;
+    const shedUrl = new URL("assets/environment/shed.glb", base).href;
+
+    try {
+      const house = await this.assets.loadEnvironment(houseUrl);
+      this.world.attachHouseAsset(house);
+    } catch (error) {
+      console.warn("House GLB unavailable; showcase fallback remains active.", error);
+    }
+
+    try {
+      const shed = await this.assets.loadEnvironment(shedUrl);
+      this.world.attachShedAsset(shed);
+    } catch (error) {
+      console.warn("Shed GLB unavailable; showcase fallback remains active.", error);
+    }
   }
 
   private loop = (now: number) => {
