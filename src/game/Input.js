@@ -1,1 +1,29 @@
-export class Input{constructor(){this.keys=new Set();this.just=new Set();addEventListener("keydown",e=>{if(!this.keys.has(e.code))this.just.add(e.code);this.keys.add(e.code)});addEventListener("keyup",e=>this.keys.delete(e.code));document.querySelectorAll("[data-k]").forEach(b=>{const k=b.dataset.k,map={w:"KeyW",a:"KeyA",s:"KeyS",d:"KeyD",e:"KeyE"};b.addEventListener("pointerdown",()=>this.keys.add(map[k]));b.addEventListener("pointerup",()=>this.keys.delete(map[k]));b.addEventListener("pointercancel",()=>this.keys.delete(map[k]));});}down(c){return this.keys.has(c)}update(){this.just.clear()}}
+export class Input{
+  constructor(){
+    this.keys=new Set();
+    this.just=new Set();
+    const set=(code,on)=>{if(on)this.keys.add(code);else this.keys.delete(code)};
+    addEventListener("keydown",e=>{
+      if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code))e.preventDefault();
+      if(!this.keys.has(e.code))this.just.add(e.code);
+      this.keys.add(e.code);
+    },{passive:false});
+    addEventListener("keyup",e=>this.keys.delete(e.code));
+    addEventListener("blur",()=>{this.keys.clear();this.just.clear()});
+    document.querySelectorAll("[data-k]").forEach(b=>{
+      const map={w:"KeyW",a:"KeyA",s:"KeyS",d:"KeyD",e:"KeyE",shift:"ShiftLeft",space:"Space",r:"KeyR"};
+      const code=map[b.dataset.k];
+      if(!code)return;
+      const press=e=>{e.preventDefault();if(!this.keys.has(code))this.just.add(code);set(code,true)};
+      const release=e=>{e.preventDefault();set(code,false)};
+      b.addEventListener("pointerdown",press,{passive:false});
+      b.addEventListener("pointerup",release,{passive:false});
+      b.addEventListener("pointercancel",release,{passive:false});
+      b.addEventListener("pointerleave",release,{passive:false});
+      b.addEventListener("contextmenu",e=>e.preventDefault());
+    });
+  }
+  down(c){return this.keys.has(c)}
+  pressed(c){const hit=this.just.has(c);if(hit)this.just.delete(c);return hit}
+  endFrame(){this.just.clear()}
+}
