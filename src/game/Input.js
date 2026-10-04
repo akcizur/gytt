@@ -8,6 +8,7 @@ export class Input{
     this.just=new Set();
     this.move={x:0,y:0,strength:0};
     this.look={x:0,y:0,strength:0};
+    this.lookActive=false;
     this.touchActive=false;
     this.mouseLook={x:0,y:0};
 
@@ -112,11 +113,13 @@ export class Input{
       this.look.x=v.x*force;
       this.look.y=-v.y*force;
       this.look.strength=force;
+      this.lookActive=true;
       this.touchActive=true;
     });
 
     this.rightJoy.on("end",()=>{
       this.look.x=0;this.look.y=0;this.look.strength=0;
+      this.lookActive=false;
       this.touchActive=!!(this.move.strength>0);
     });
   }
@@ -126,6 +129,7 @@ export class Input{
     this.just.clear();
     this.move.x=0;this.move.y=0;this.move.strength=0;
     this.look.x=0;this.look.y=0;this.look.strength=0;
+    this.lookActive=false;
     this.touchActive=false;
     this.mouseLook.x=0;this.mouseLook.y=0;
   }
