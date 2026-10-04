@@ -2,7 +2,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { ASSETS } from "./AssetRegistry.js";
 
 const MOVE_DEAD=.08;
-const LOOK_SPEED=3.6;
+const LOOK_SPEED=4.8;
+const LOOK_DEAD=.06;
 
 export class Player{
   constructor(g){
@@ -226,9 +227,10 @@ export class Player{
     const target=this.pos.clone().add(new T.Vector3(0,1.05,0));
     const mouse=i.consumeMouseLook();
 
-    if(i.look.strength>.02){
-      this.yaw-=i.lookX()*LOOK_SPEED*dt;
-      this.pitch-=i.lookY()*LOOK_SPEED*dt;
+    if(i.lookActive && i.look.strength>LOOK_DEAD){
+      const strength=Math.min(1,i.look.strength);
+      this.yaw-=i.lookX()*LOOK_SPEED*(.55+.45*strength)*dt;
+      this.pitch-=i.lookY()*LOOK_SPEED*(.55+.45*strength)*dt;
     }else if(Math.abs(mouse.x)+Math.abs(mouse.y)>0){
       this.yaw-=mouse.x*.003;
       this.pitch-=mouse.y*.0025;
@@ -249,9 +251,10 @@ export class Player{
     const T=this.T,c=this.g.world.camera,i=this.g.input;
     const target=this.g.vehicle.pos.clone().add(new T.Vector3(0,1.35,0));
     const mouse=i.consumeMouseLook();
-    if(i.look.strength>.02){
-      this.yaw-=i.lookX()*LOOK_SPEED*dt;
-      this.pitch-=i.lookY()*LOOK_SPEED*dt;
+    if(i.lookActive && i.look.strength>LOOK_DEAD){
+      const strength=Math.min(1,i.look.strength);
+      this.yaw-=i.lookX()*LOOK_SPEED*(.55+.45*strength)*dt;
+      this.pitch-=i.lookY()*LOOK_SPEED*(.55+.45*strength)*dt;
     }else if(Math.abs(mouse.x)+Math.abs(mouse.y)>0){
       this.yaw-=mouse.x*.003;
       this.pitch-=mouse.y*.0025;
