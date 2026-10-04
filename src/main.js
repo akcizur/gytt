@@ -17,7 +17,7 @@ app.innerHTML=`
   <div id="move-zone" class="stick-zone"><span>MOVE</span></div>
   <div id="look-zone" class="stick-zone"><span>LOOK</span></div>
   <div class="actions">
-    <button data-action="run">RUN</button><button data-action="jump">JUMP</button>
+    <button data-action="run">RUN</button><button data-action="crouch">CROUCH</button><button data-action="jump">JUMP</button><button data-action="roll">ROLL</button>
     <button data-action="interact">USE</button><button data-action="reset">RESET</button>
   </div>
 </div>
