@@ -1,4 +1,4 @@
-name: MAVON DISTRICT — Build & GitHub Pages
+name: GYTT — Build & GitHub Pages
 
 on:
   push:
@@ -59,3 +59,4 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v5
+  
