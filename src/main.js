@@ -5,6 +5,7 @@ import { Game } from "./game/Game.js";
 
 const base=import.meta.env.BASE_URL;
 const app=document.querySelector("#app");
+
 app.innerHTML=`
 <canvas id="game"></canvas>
 <div id="hud">
@@ -16,6 +17,18 @@ app.innerHTML=`
   <div class="pad"><button data-k="w">▲</button><div><button data-k="a">◀</button><button data-k="s">▼</button><button data-k="d">▶</button></div></div>
   <div class="actions"><button data-k="shift">RUN</button><button data-k="space">JUMP</button><button data-k="e">E</button><button data-k="r">RESET</button></div>
 </div>
-<div id="help">WASD move • E enter/exit • SHIFT sprint • SPACE jump • R reset</div>`;
-await RAPIER.init();
-new Game({canvas:document.querySelector("#game"),THREE,RAPIER,base}).start();
+<div id="help">WASD move • E enter/exit • SHIFT sprint • SPACE jump • R reset</div>
+<div id="fatal" hidden></div>`;
+
+try{
+  await RAPIER.init();
+  const game=new Game({canvas:document.querySelector("#game"),THREE,RAPIER,base});
+  await game.start();
+}catch(error){
+  console.error("GYTT startup failed",error);
+  const fatal=document.querySelector("#fatal");
+  if(fatal){
+    fatal.hidden=false;
+    fatal.textContent="GYTT se nepodařilo spustit. Obnov stránku.";
+  }
+}
