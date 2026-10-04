@@ -27,7 +27,7 @@ export class AssetManager {
 
   async loadCharacter(url: string): Promise<CharacterAsset> {
     const gltf = await this.loadGLTF(url);
-    const scene = gltf.scene.clone(true);
+    const scene = gltf.scene;
 
     scene.traverse((object) => {
       const mesh = object as T.Mesh;
@@ -36,7 +36,7 @@ export class AssetManager {
       mesh.receiveShadow = true;
     });
 
-    return { scene: scene as T.Group, animations: gltf.animations };
+    return { scene, animations: gltf.animations };
   }
 
   dispose() {
