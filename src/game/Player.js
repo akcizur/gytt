@@ -35,7 +35,7 @@ export class Player{
       const scaled=new this.T.Box3().setFromObject(model);model.position.y=-scaled.min.y;
       this.mesh.clear();this.mesh.add(model);this.mesh.userData.model=model;
       model.userData.baseY=model.position.y;
-      this.mixer=gltf.animations.length?new this.T.AnimationMixer(model):null;
+      this.mixer=new this.T.AnimationMixer(model);
       for(const clip of gltf.animations)this.animations[clip.name.toLowerCase()]=this.mixer.clipAction(clip);
       this.play("idle");
       this.loadAnimationLibrary();
