@@ -76,7 +76,11 @@ export class World{
     const box=new this.T.Box3().setFromObject(mesh);if(!isFinite(box.min.x))return;
     const size=box.getSize(new this.T.Vector3()),center=box.getCenter(new this.T.Vector3());
     if(size.x<.1||size.y<.1||size.z<.1)return;
-    const rb=this.world.createRigidBody(this.R.RigidBodyDesc.fixed().setTranslation(center.x,center.y,center.z));
+    const rb=this.world.createRigidBody(
+      this.R.RigidBodyDesc.fixed()
+        .setTranslation(center.x,center.y,center.z)
+        .setRotation({x:0,y:Math.sin(mesh.rotation.y/2),z:0,w:Math.cos(mesh.rotation.y/2)})
+    );
     this.world.createCollider(this.R.ColliderDesc.cuboid(size.x/2,size.y/2,size.z/2),rb);
     chunk.colliders.push(rb);
   }
@@ -125,7 +129,13 @@ export class World{
   }
   update(dt=.016){
     this.world.timestep=Math.min(.033,Math.max(.001,dt));this.world.step();
-    if(this.player)this.streaming.update(this.player.pos);
+    if(this.player){
+      this.streamingTimer=(this.streamingTimer||0)+dt;
+      if(this.streamingTimer>=.35){
+        this.streamingTimer=0;
+        this.streaming.update(this.player.pos);
+      }
+    }
     this.lod?.update(dt);
   }
   render(){this.renderer.render(this.scene,this.camera)}
