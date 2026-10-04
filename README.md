@@ -1,67 +1,50 @@
-# GYTT
+# GYTT — Full Game DEV
 
-A free/open-source GTA-like browser game foundation for GitHub Pages.
+A clean-room browser open-world game foundation.
 
-## Runtime stack
-
+## Stack
 - Three.js — rendering
-- Rapier 3D — character physics and collision
-- three-mesh-bvh — accelerated raycasts
-- Vite — build
-- NippleJS 1.0.4 — dual virtual mobile joysticks (MIT)
-- GitHub Actions + GitHub Pages — automatic deployment
+- Rapier 3D — character collision / physics primitives
+- NippleJS — mobile dual-stick input
+- Vite — development/build
 
-## Gameplay foundation
+## Current DEV vertical slice
+- procedural streamed-style city foundation
+- third-person player
+- WASD + mouse camera
+- mobile dual joystick
+- sprint / jump
+- collision-aware character controller
+- vehicle enter/exit and driving
+- ambient traffic
+- pedestrians
+- mission chain
+- wanted meter
+- money / local save
+- responsive HUD
+- GitHub Pages build
 
-- Third-person character controller
-- Analog 2-stick mobile controls
-- Desktop WASD fallback
-- Dual-stick orbit camera on touch
-- Sprint and jump
-- Vehicle enter/exit + analog driving
-- Traffic and pedestrian simulation
-- Procedural chunk streaming
-- Distance/shadow LOD
-- Mission HUD
-- CC0 model and animation pipeline
-
-## Open-source asset sources
-
-All runtime art is sourced from free/public-domain packs or explicitly marked as CC0 by their publishers.
-
-| Pack | License | Source |
-|---|---|---|
-| Kenney City Kit Roads | CC0 1.0 | https://kenney.nl/assets/city-kit-roads |
-| Kenney City Kit Suburban | CC0 1.0 | https://kenney.nl/assets/city-kit-suburban |
-| Kenney Car Kit | CC0 1.0 | https://kenney.nl/assets/car-kit |
-| Quaternius Universal Base Characters | CC0 1.0 | https://quaternius.com/packs/universalbasecharacters.html |
-| Quaternius Universal Animation Library | CC0 1.0 | https://quaternius.com/packs/universalanimationlibrary.html |
-| Quaternius Universal Animation Library 2 | CC0 1.0 | https://quaternius.com/packs/universalanimationlibrary2.html |
-
-The browser runtime mirrors are documented in `src/game/AssetRegistry.js`.
-
-## Mobile controls
-
-Left stick: move.
-Right stick: camera.
-RUN: sprint.
-JUMP: jump.
-E: enter/exit vehicle.
-RESET: respawn.
-
-The control layer uses NippleJS 1.0.4 with a dead-zone, analog force, safe-area layout, two simultaneous joystick zones, and haptic feedback where supported.
-
-## Run locally
-
+## Run
 ```bash
 npm install
 npm run dev
 ```
 
-## Production build
+This branch intentionally uses procedural geometry so the development build starts without downloading external art assets. Art/animation packs can be added later behind the same asset interfaces.
 
-```bash
-npm run build
-```
+## Controls
+Desktop: WASD, mouse, Shift, Space, E, R.
 
-Every push to `main` is configured to build and deploy through `.github/workflows/pages.yml`.
+Mobile: left stick = move/drive, right stick = camera, buttons = run/jump/use/reset.
+
+## Next development layers
+1. GLTF character + native animation library
+2. vehicle collision/handling upgrade
+3. road graph + traffic routing
+4. pedestrian navigation
+5. police AI / wanted chase
+6. mission editor/data files
+7. audio
+8. save slots
+9. chunk streaming + LOD
+10. combat
