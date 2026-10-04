@@ -8,6 +8,7 @@ export class Game{
   constructor({THREE,RAPIER,canvas}){this.T=THREE||T;this.R=RAPIER;this.canvas=canvas;this.input=new Input();this.scene=new this.T.Scene();this.scene.background=new this.T.Color(0x8fb0c9);this.scene.fog=new this.T.Fog(0x8fb0c9,55,260);this.camera=new this.T.PerspectiveCamera(62,innerWidth/innerHeight,.05,500);this.renderer=new this.T.WebGLRenderer({canvas,antialias:true,powerPreference:"high-performance"});this.renderer.setPixelRatio(Math.min(devicePixelRatio,2));this.renderer.setSize(innerWidth,innerHeight);this.renderer.outputColorSpace=this.T.SRGBColorSpace;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=this.T.PCFSoftShadowMap;this.world=new this.R.World({x:0,y:-18,z:0});this.inputYaw=0;this.pitch=-.22;this.mode="foot";this.gltfLoader=new GLTFLoader();this.money=2500;this.wanted=0;this.wantedTimer=0;this.toastTimer=0;this.last=performance.now();this.frames=0;this.fpsAt=0;this.bindResize();this.bindMouse()}
   async start(){this.buildLighting();this.buildWorld();this.buildPlayer();this.buildVehicle();this.buildTraffic();this.buildPedestrians();this.buildPolice();this.buildMissions();this.load();this.loadVisualModels();this.camera.position.set(5,4.2,14);this.camera.lookAt(0,1.2,8);document.querySelector("#boot").style.opacity=0;setTimeout(()=>document.querySelector("#boot")?.remove(),600);this.show("WASD + mouse • E enter vehicle • Shift sprint • Space jump");requestAnimationFrame(this.loop.bind(this))}
   assetUrl(path){return "https://raw.githubusercontent.com/Hidencod/tge-assets/main/packs/"+path}
+  loadExternalGltf(url,timeout=12000){return new Promise((resolve,reject)=>{let settled=false;const timer=setTimeout(()=>{if(!settled){settled=true;reject(new Error("asset timeout"))}},timeout);this.gltfLoader.load(url,g=>{if(settled)return;settled=true;clearTimeout(timer);resolve(g)},undefined,e=>{if(settled)return;settled=true;clearTimeout(timer);reject(e)})})}
   loadAsset(path,timeout=12000){return new Promise((resolve,reject)=>{let settled=false;const timer=setTimeout(()=>{if(!settled){settled=true;reject(new Error("asset timeout"))}},timeout);this.gltfLoader.load(this.assetUrl(path),g=>{if(settled)return;settled=true;clearTimeout(timer);resolve(g)},undefined,e=>{if(settled)return;settled=true;clearTimeout(timer);reject(e)})})}
   prepAsset(scene,height=2.5){const root=scene;const box=new this.T.Box3().setFromObject(root),size=box.getSize(new this.T.Vector3());if(height&&size.y>0.001){const s=height/size.y;root.scale.multiplyScalar(s)}const after=new this.T.Box3().setFromObject(root);root.position.y-=after.min.y;root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=true;if(o.material?.map)o.material.map.colorSpace=this.T.SRGBColorSpace}});return root}
   replaceVisual(group,source,height=2.5){const clone=SkeletonUtils.clone(source);this.prepAsset(clone,height);group.clear();group.add(clone);return clone}
@@ -31,14 +32,39 @@ this.show(sedan.status==="fulfilled"||trafficSources.length?"CC0 vehicle models 
   addTree(x,z){const g=new this.T.Group(),trunk=this.box(1.2,4,1.2,0x5b4430),crown=new this.T.Mesh(new this.T.IcosahedronGeometry(3.5,1),this.mat(0x31583e));trunk.position.y=2;crown.position.y=5.5;crown.castShadow=true;g.add(trunk,crown);g.position.set(x,0,z);this.scene.add(g)}
   addLandmark(x,z){const p=this.box(16,1,16,0x6d747b);p.position.set(x,.5,z);this.scene.add(p);const ring=new this.T.Mesh(new this.T.TorusGeometry(6,.18,10,48),this.mat(0xd9b25d,.4,.5));ring.rotation.x=Math.PI/2;ring.position.set(x,1.1,z);this.scene.add(ring)}
   buildPlayer(){this.player={pos:new this.T.Vector3(0,1,8),vel:new this.T.Vector3(),yaw:0,grounded:false,health:100,model:new this.T.Group(),action:"idle",mixer:null,clips:{},bones:{},animationLock:false,animationState:"idle"};const g=this.player.model;g.userData.noCameraCollision=true;const body=this.box(1,1.7,.55,0x3e6fb4),head=new this.T.Mesh(new this.T.SphereGeometry(.38,16,12),this.mat(0xc98d6b));body.position.y=1.25;head.position.y=2.3;g.add(body,head);g.position.copy(this.player.pos);this.scene.add(g);this.player.body=this.world.createRigidBody(this.R.RigidBodyDesc.kinematicPositionBased().setTranslation(this.player.pos.x,this.player.pos.y+.7,this.player.pos.z));this.player.collider=this.world.createCollider(this.R.ColliderDesc.capsule(.7,.38),this.player.body);this.player.controller=this.world.createCharacterController(.05);this.player.controller.enableAutostep(.6,.25,true);this.player.controller.enableSnapToGround(.3);this.player.controller.setApplyImpulsesToDynamicBodies?.(false);this.loadRiggedPlayer()}
-  loadRiggedPlayer(){const url="https://raw.githubusercontent.com/programasweights/avatar/main/public/assets/character.glb";this.gltfLoader.load(url,gltf=>{const rig=gltf.scene;const box=new this.T.Box3().setFromObject(rig),size=box.getSize(new this.T.Vector3());const scale=2.35/Math.max(size.y,0.001);rig.scale.setScalar(scale);const scaled=new this.T.Box3().setFromObject(rig),min=scaled.min.y;rig.position.y=-min;rig.traverse(o=>{o.castShadow=true;o.receiveShadow=true});rig.userData.noCameraCollision=true;this.player.model.clear();this.player.model.add(rig);this.player.rig=rig;this.player.bones={hips:rig.getObjectByName("Hips"),spine:rig.getObjectByName("Spine"),head:rig.getObjectByName("Head"),lUpper:rig.getObjectByName("LeftUpperLeg"),rUpper:rig.getObjectByName("RightUpperLeg"),lLower:rig.getObjectByName("LeftLowerLeg"),rLower:rig.getObjectByName("RightLowerLeg"),lArm:rig.getObjectByName("LeftUpperArm"),rArm:rig.getObjectByName("RightUpperArm")};this.show("CC0 RIGGED PLAYER READY");this.loadAnimationLibrary(rig)},undefined,()=>this.show("Rigged model unavailable — fallback active"))}
+  async loadRiggedPlayer(){
+    const url="https://raw.githubusercontent.com/programasweights/avatar/main/public/assets/character.glb";
+    try{
+      const gltf=await this.loadExternalGltf(url,12000),rig=gltf.scene;
+      const box=new this.T.Box3().setFromObject(rig),size=box.getSize(new this.T.Vector3());
+      const scale=2.35/Math.max(size.y,0.001);
+      rig.scale.setScalar(scale);
+      const scaled=new this.T.Box3().setFromObject(rig),min=scaled.min.y;
+      rig.position.y=-min;
+      rig.traverse(o=>{o.castShadow=true;o.receiveShadow=true});
+      rig.userData.noCameraCollision=true;
+      this.player.model.clear();
+      this.player.model.add(rig);
+      this.player.rig=rig;
+      this.player.bones={
+        hips:rig.getObjectByName("Hips"),spine:rig.getObjectByName("Spine"),head:rig.getObjectByName("Head"),
+        lUpper:rig.getObjectByName("LeftUpperLeg"),rUpper:rig.getObjectByName("RightUpperLeg"),
+        lLower:rig.getObjectByName("LeftLowerLeg"),rLower:rig.getObjectByName("RightLowerLeg"),
+        lArm:rig.getObjectByName("LeftUpperArm"),rArm:rig.getObjectByName("RightUpperArm")
+      };
+      this.show("CC0 RIGGED PLAYER READY");
+      await this.loadAnimationLibrary(rig)
+    }catch{
+      this.show("Rigged model unavailable — procedural fallback active")
+    }
+  }
   async loadAnimationLibrary(rig){
     const urls=[
       "https://raw.githubusercontent.com/Barbatos6669/elderforge/main/assets/animations/universal_animation_library_1/UAL1_Standard.glb",
       "https://raw.githubusercontent.com/Barbatos6669/elderforge/main/assets/animations/universal_animation_library_2/UAL2_Standard.glb"
     ];
     try{
-      const results=await Promise.allSettled(urls.map(url=>new Promise((resolve,reject)=>this.gltfLoader.load(url,resolve,undefined,reject))));
+      const results=await Promise.allSettled(urls.map(url=>this.loadExternalGltf(url,12000)));
       const targetSkinned=(()=>{let found=null;rig.traverse(o=>{if(!found&&o.isSkinnedMesh)found=o});return found})();
       if(!targetSkinned){this.show("Animation fallback — no skinned target");return}
       const clips=[];
