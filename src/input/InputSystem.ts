@@ -5,10 +5,13 @@ export type Actions = {
 };
 
 const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-const deadzone = (v: number, zone = 0.10) => {
+const deadzone = (v: number, zone = 0.08) => {
   const a = Math.abs(v);
   if (a <= zone) return 0;
-  return Math.sign(v) * ((a - zone) / (1 - zone));
+  const normalized = (a - zone) / (1 - zone);
+  // Smooth the first part of the stick for precision without feeling sluggish.
+  const curved = normalized * normalized * (3 - 2 * normalized);
+  return Math.sign(v) * curved;
 };
 
 export class InputSystem {
@@ -89,18 +92,19 @@ export class InputSystem {
       const p = this.pointers.get(e.pointerId);
       if (!p || this.activeStick[p.kind] !== e.pointerId) return;
 
-      const radius = Math.max(42, Math.min(el.clientWidth, el.clientHeight) * 0.38);
+      const radius = Math.max(44, Math.min(el.clientWidth, el.clientHeight) * 0.42);
       const dx = e.clientX - p.x;
       const dy = e.clientY - p.y;
 
       if (kind === "move") {
-        this.stickMove.x = clamp(dx / radius);
+        this.stickMove.x = deadzone(clamp(dx / radius), 0.08);
         // Screen Y is inverted: swipe upward means forward.
-        this.stickMove.y = clamp(-dy / radius);
+        this.stickMove.y = deadzone(clamp(-dy / radius), 0.08);
       } else {
-        this.stickLook.x += dx * 0.00135;
+        // Camera: responsive at small movements, but capped to prevent jumps.
+        this.stickLook.x = clamp(this.stickLook.x + dx * 0.00165, -0.14, 0.14);
         // Screen Y is inverted for orbit control: swipe up looks up.
-        this.stickLook.y += dy * 0.00115;
+        this.stickLook.y = clamp(this.stickLook.y + dy * 0.00135, -0.12, 0.12);
         p.x = e.clientX;
         p.y = e.clientY;
       }
@@ -143,8 +147,8 @@ export class InputSystem {
 
     this.actions.moveX = clamp(this.stickMove.x + keyX + gp.moveX);
     this.actions.moveY = clamp(this.stickMove.y + keyY + gp.moveY);
-    this.actions.lookX += this.stickLook.x + gp.lookX * 0.075;
-    this.actions.lookY += this.stickLook.y + gp.lookY * 0.060;
+    this.actions.lookX += this.stickLook.x + gp.lookX * 0.090;
+    this.actions.lookY += this.stickLook.y + gp.lookY * 0.075;
 
     this.actions.sprint =
       this.down("ShiftLeft") || this.down("ShiftRight") || !!gamepad?.buttons[10]?.pressed;
