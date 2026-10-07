@@ -88,16 +88,18 @@ export class Game {
   private async loadShowcaseEnvironment() {
     const houseUrl = resolvePublicAsset("assets/environment/house.glb");
     const shedUrl = resolvePublicAsset("assets/environment/shed.glb");
+    const remoteHouseUrl = "https://raw.githubusercontent.com/kikoncuo/jevfire/5df83b558bf635e006d31f8f2fc2798d0e3ff051/web/public/assets/house.glb";
+    const remoteShedUrl = "https://cdn.3dassets.dev/assets/27286/v1/model.glb";
 
     try {
-      const house = await this.assets.loadEnvironment(houseUrl);
+      const house = await this.assets.loadEnvironment(houseUrl, remoteHouseUrl);
       this.world.attachHouseAsset(house);
     } catch (error) {
       console.warn("House GLB unavailable; showcase fallback remains active.", error);
     }
 
     try {
-      const shed = await this.assets.loadEnvironment(shedUrl);
+      const shed = await this.assets.loadEnvironment(shedUrl, remoteShedUrl);
       this.world.attachShedAsset(shed);
     } catch (error) {
       console.warn("Shed GLB unavailable; showcase fallback remains active.", error);
